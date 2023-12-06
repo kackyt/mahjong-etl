@@ -3,17 +3,17 @@ erDiagram
   game_players ||--|{ games : ""
   game_players ||--|{ players : ""
   games ||--|{ kyokus : ""
-  kyokus ||--|| haipais : ""
+  kyokus ||--|{ haipais : ""
   kyokus ||--|| actions : ""
-  kyokus ||--|| results : ""
+  kyokus ||--o| agaris : ""
+  kyokus ||--o| nagares : ""
 
   players {
-    bigint id PK
-    varchar(255) name
+    varchar(255) name PK
   }
   kyokus {
     bigint id PK
-    bigint game_id
+    string game_id FK
     bigint index
     bigint honba
     bigint riichibou
@@ -23,10 +23,8 @@ erDiagram
 
   haipais {
     bigint kyoku_id PK,FK
-    array(string) haipai_1
-    array(string) haipai_2
-    array(string) haipai_3
-    array(string) haipai_4
+    bigint player_index
+    array(string) haipai
   }
 
   actions {
@@ -34,26 +32,35 @@ erDiagram
     array(string) action_array
   }
 
-  results {
+  agaris {
     bigint kyoku_id PK,FK
     bigint machi_no
     bigint ten
+    bigint fu
+    bigint han
+    array(string) tehai
     array(string) yaku
     array(int) dorahai
     array(int) uradora
     int who
     int from
-    array(int) score
+    array(int) score_diff
     int owari
   }
+
+  nagares {
+    bigint kyoku_id PK,FK
+    string name
+    array(int) score_diff
+  }
+
   game_players {
-    bigint id PK
-    bigint game_id
-    bigint player_id
+    bigint game_id PK, FK
+    string player_name
     bigint player_index
   }
   games {
-    bigint id PK
+    string id PK
     bigint initial_score
     timestamp started_at
   }

@@ -1,4 +1,7 @@
 from urllib.parse import urlparse
+from typing import List, Dict
+import xml.etree.ElementTree as ET
+import pandas as pd
 import requests
 import gzip
 import re
@@ -43,6 +46,70 @@ for archive_item in files:
 
                 log_file = requests.get(url, headers=headers)
 
+                doc = ET.fromstring(log_file.text)
+
                 with open(f"logs/{log_id}.xml", "w") as f:
                     f.write(log_file.text)
         break
+
+# parquetに書き出すテーブルおよびレコード
+class Serializable:
+    def to_parquet(self, outpath: str):
+        df = pd.DataFrame(self.__dict__)
+        df.to_parquet(outpath)
+
+class Player(Serializable):
+    name: str
+
+class Game(Serializable):
+    id: str
+    initial_score: int
+    started_at: str
+
+class GamePlayer(Serializable):
+    game_id: str
+    player_name: str
+    player_index: int
+
+class Kyoku(Serializable):
+    id: int
+    game_id: str
+    index: int
+    honba: int
+    riichibou: int
+    kazes: List[int]
+
+class Haipai(Serializable):
+    kyoku_id: int
+    player_index: int
+    haipai: str
+
+class Agari(Serializable):
+    kyoku_id: int
+    machi_no: str
+    score: int
+    fu: int
+    han: int
+    tehai: str
+    dora: List[int]
+    uradora: List[int]
+    who: int
+    by: int
+    score_diff: List[int]
+    owari: bool
+
+
+players: Dict[str, Player] = {}
+
+
+def parse_document(root: ET.Element):
+    for child in root:
+        if child.tag == "GO":
+        elif child.tag == "UN":
+        elif child.tag == "TAIKYOKU":
+            # do nothing
+        elif child.tag == "INIT":
+        elif child.tag == "DORA":
+        elif child.tag == "N":
+            
+
