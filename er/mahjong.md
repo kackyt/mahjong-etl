@@ -4,7 +4,7 @@ erDiagram
   game_players ||--|{ players : ""
   games ||--|{ kyokus : ""
   kyokus ||--|{ haipais : ""
-  kyokus ||--|| actions : ""
+  kyokus ||--|{ actions : ""
   kyokus ||--o| agaris : ""
   kyokus ||--o| nagares : ""
 
@@ -24,12 +24,15 @@ erDiagram
   haipais {
     bigint kyoku_id PK,FK
     bigint player_index
-    array(string) haipai
+    string haipai
   }
 
   actions {
     bigint kyoku_id PK,FK
-    array(string) action_array
+    bigint player_index
+    int seq
+    string type
+    string pais
   }
 
   agaris {
@@ -38,7 +41,7 @@ erDiagram
     bigint ten
     bigint fu
     bigint han
-    array(string) tehai
+    string tehai
     array(string) yaku
     array(int) dorahai
     array(int) uradora
