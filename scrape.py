@@ -9,6 +9,7 @@ import gzip
 import re
 import os
 import time
+import urllib.parse
 
 # parquetに書き出すテーブルおよびレコード
 Player = pa.schema([
@@ -217,6 +218,7 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
     oya: int = 0
     tsumohai: int = 0
     dt64 = pa.scalar(dt, type=pa.date64())
+    player_name: Dict[str, str] = {}
 
     game = pa.RecordBatch.from_arrays([
         pa.array([game_id]),
@@ -232,12 +234,18 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
             else:
                 has_aka = False
         elif child.tag == "UN":
-            game_player = pa.RecordBatch.from_arrays([
-                pa.array([game_id, game_id, game_id, game_id]),
-                pa.array([child.attrib["n0"], child.attrib["n1"], child.attrib["n2"], child.attrib["n3"]]),
-                pa.array([0, 1, 2, 3])
-            ], schema=GamePlayer)
-            game_players.append(game_player)
+            n0 = child.attrib.get("n0")
+            n1 = child.attrib.get("n1")
+            n2 = child.attrib.get("n2")
+            n3 = child.attrib.get("n3")
+            if n0 is not None:
+                player_name["n0"] = urllib.parse.unquote(n0)
+            if n1 is not None:
+                player_name["n1"] = urllib.parse.unquote(n1)
+            if n2 is not None:
+                player_name["n2"] = urllib.parse.unquote(n2)
+            if n3 is not None:
+                player_name["n3"] = urllib.parse.unquote(n3)
         elif child.tag == "TAIKYOKU":
             # do nothing
             _ = 0
@@ -277,10 +285,11 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
         elif child.tag == "AGARI":
             ten = child.attrib["ten"].split(",")
             sc = child.attrib["sc"].split(",")
-            yaku = child.attrib["yaku"].split(",")
+            yakustr = child.attrib.get("yaku")
+            yaku = yakustr.split(",") if yakustr is not None else []
             yaku_names: List[str] = []
-            yakustr = child.attrib.get("yakuman")
-            yakuman = yakustr.split(",") if yakustr is not None else []
+            yakumanstr = child.attrib.get("yakuman")
+            yakuman = yakumanstr.split(",") if yakumanstr is not None else []
             who = int(child.attrib["who"])
             fromWho = int(child.attrib["fromWho"])
             owari = child.attrib.get("owari") is not None
@@ -394,6 +403,12 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
             ], schema=Action)
             actions.append(action)
             action_count += 1
+    game_player = pa.RecordBatch.from_arrays([
+        pa.array([game_id] * len(player_name)),
+        pa.array([name[0] for name in sorted(player_name.items())]),
+        pa.array(list(range(len(player_name))))
+    ], schema=GamePlayer)
+    game_players.append(game_player)
 
 
 headers = {
