@@ -68,6 +68,12 @@ Action = pa.schema([
     pa.field("pais", pa.string())
 ])
 
+Nagare = pa.schema([
+    pa.field("kyoku_id", pa.int64()),
+    pa.field("name", pa.string()),
+    pa.field("score_diff", pa.list_(pa.int32(), 4))
+])
+
 players: Dict[str, pa.RecordBatch] = {}
 games: List[pa.RecordBatch] = []
 game_players: List[pa.RecordBatch] = []
@@ -75,6 +81,7 @@ kyokus: List[Dict[str, Any]] = []
 haipais: List[Dict[str, Any]] = []
 actions: List[pa.RecordBatch] = []
 agaris: List[pa.RecordBatch] = []
+nagares: List[Dict[str, Any]] = []
 
 yaku_table = [
     '門前清自摸和', '立直', '一発', '槍槓', '嶺上開花',
@@ -89,6 +96,15 @@ yaku_table = [
     '九蓮宝燈', '純正九蓮宝燈', '国士無双', '国士無双１３面', '大四喜',
     '小四喜', '四槓子', 'ドラ', '裏ドラ', '赤ドラ',
 ]
+
+nagare_table = {
+    "nm":     '流し満貫',
+    "yao9":   '九種九牌',
+    "kaze4":  '四風連打',
+    "reach4": '四家立直',
+    "ron3":   '三家和了',
+    "kan4":   '四槓散了',
+}
 
 
 def dora_hai(num_list: List[int]) -> List[str]:
@@ -298,7 +314,7 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
             reach = child.attrib["step"] == "1"
         elif child.tag == "AGARI":
             ten = child.attrib["ten"].split(",")
-            sc = child.attrib["sc"].split(",")
+            sc = list(map(lambda x: int(x) * 100, child.attrib["sc"].split(",")))
             yakustr = child.attrib.get("yaku")
             yaku = yakustr.split(",") if yakustr is not None else []
             yaku_names: List[str] = []
@@ -338,7 +354,7 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
 
             score = int(ten[1])
 
-            scs = [int(sc[1]), int(sc[3]), int(sc[5]), int(sc[7])]
+            scs = [sc[1], sc[3], sc[5], sc[7]]
 
             dora_str = dora_hai(list(map(lambda x: int(x), child.attrib["doraHai"].split(","))))
 
@@ -362,6 +378,18 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
                 pa.array([owari]),
             ], schema=Agari)
             agaris.append(agari)
+        elif child.tag == "RYUUKYOKU":
+            sc = list(map(lambda x: int(x) * 100, child.attrib["sc"].split(",")))
+            scs = [sc[1], sc[3], sc[5], sc[7]]
+            typ = child.attrib.get("type")
+
+            name = nagare_table[typ] if typ is not None and nagare_table.get(typ) is not None else "流局"
+
+            nagares.append({
+                "kyoku_id": kyoku_id,
+                "name": name,
+                "score_diff": scs
+            })
         elif child.tag == "N":
             # なき
             who = int(child.attrib["who"])
@@ -475,7 +503,9 @@ for archive_item in files:
 
                 doc = ET.fromstring(log_file.text)
 
-                with open(f"logs/{log_id}.xml", "w") as f:
+                os.makedirs(f"logs/{dtstr[0]}", exist_ok=True)
+
+                with open(f"logs/{dtstr[0]}/{log_id}.xml", "w") as f:
                     f.write(log_file.text)
 
                 parse_document(doc, log_id, dt)
@@ -503,6 +533,9 @@ for archive_item in files:
                 for record in actions:
                     wa.write_batch(record)
                 wa.close()
-
-
+                if len(nagares) > 0:
+                    wn = pq.ParquetWriter("nagares.parquet", schema=Nagare)
+                    batch = pa.RecordBatch.from_pandas(pd.DataFrame(nagares), schema=Nagare)
+                    wn.write_batch(batch)
+                    wn.close()
         break
