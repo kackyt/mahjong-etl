@@ -10,6 +10,7 @@ packages = [{include = "mahjong_etl"}]
 python = "^3.9"
 requests = "^2.31.0"
 pyarrow = "^14.0.1"
+pandas = "^2.1.4"
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.7.1"

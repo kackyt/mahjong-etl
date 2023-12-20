@@ -1,9 +1,10 @@
 from urllib.parse import urlparse
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 from datetime import datetime
 import xml.etree.ElementTree as ET
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pandas as pd
 import requests
 import gzip
 import re
@@ -32,7 +33,7 @@ Kyoku = pa.schema([
     pa.field("game_id", pa.string()),
     pa.field("kyoku_num", pa.int32()),
     pa.field("honba", pa.int32()),
-    pa.field("riichibou", pa.int32()),
+    pa.field("reachbou", pa.int32()),
     pa.field("scores", pa.list_(pa.int32(), 4)),
     pa.field("kazes", pa.list_(pa.int32(), 4))
 ])
@@ -70,7 +71,7 @@ Action = pa.schema([
 players: Dict[str, pa.RecordBatch] = {}
 games: List[pa.RecordBatch] = []
 game_players: List[pa.RecordBatch] = []
-kyokus: List[pa.RecordBatch] = []
+kyokus: List[Dict[str, Any]] = []
 haipais: List[pa.RecordBatch] = []
 actions: List[pa.RecordBatch] = []
 agaris: List[pa.RecordBatch] = []
@@ -268,16 +269,15 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
             kyoku_id = int(time.time() * 1000)
             scores = list(map(lambda x: int(x) * 100, child.attrib["ten"].split(",")))
 
-            current_kyoku = pa.RecordBatch.from_arrays([
-                pa.array([kyoku_id]),
-                pa.array([game_id]),
-                pa.array([kyoku_num]),
-                pa.array([honba]),
-                pa.array([reachbou]),
-                pa.array([scores]),
-                pa.array([kaze_table[oya]])
-            ], schema=Kyoku)
-            kyokus.append(current_kyoku)
+            kyokus.append({
+                "id": kyoku_id,
+                "game_id": game_id,
+                "kyoku_num": kyoku_num,
+                "honba": honba,
+                "reachbou": reachbou,
+                "scores": scores,
+                "kazes": kaze_table[oya],
+            })
         elif child.tag == "DORA":
             _ = 0
         elif child.tag == "REACH":
@@ -478,8 +478,8 @@ for archive_item in files:
                     wgp.write_batch(record)
                 wgp.close()
                 wk = pq.ParquetWriter("kyokus.parquet", schema=Kyoku)
-                for record in kyokus:
-                    wk.write_batch(record)
+                batch = pa.RecordBatch.from_pandas(pd.DataFrame(kyokus), schema=Kyoku)
+                wk.write_batch(batch)
                 wk.close()
                 wh = pq.ParquetWriter("haipais.parquet", schema=Haipai)
                 for record in haipais:
