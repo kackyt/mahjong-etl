@@ -72,7 +72,7 @@ players: Dict[str, pa.RecordBatch] = {}
 games: List[pa.RecordBatch] = []
 game_players: List[pa.RecordBatch] = []
 kyokus: List[Dict[str, Any]] = []
-haipais: List[pa.RecordBatch] = []
+haipais: List[Dict[str, Any]] = []
 actions: List[pa.RecordBatch] = []
 agaris: List[pa.RecordBatch] = []
 
@@ -278,6 +278,20 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
                 "scores": scores,
                 "kazes": kaze_table[oya],
             })
+
+            # 配牌
+            for n in range(4):
+                haistr = child.attrib.get(f"hai{n}")
+
+                if haistr is not None and haistr != "":
+                    haipai = num_to_hai(
+                        list(map(lambda x: int(x), haistr.split(","))),
+                        has_aka)
+                    haipais.append({
+                        "kyoku_id": kyoku_id,
+                        "player_index": n,
+                        "haipai": haipai
+                    })
         elif child.tag == "DORA":
             _ = 0
         elif child.tag == "REACH":
@@ -482,8 +496,8 @@ for archive_item in files:
                 wk.write_batch(batch)
                 wk.close()
                 wh = pq.ParquetWriter("haipais.parquet", schema=Haipai)
-                for record in haipais:
-                    wh.write_batch(record)
+                batch = pa.RecordBatch.from_pandas(pd.DataFrame(haipais), schema=Haipai)
+                wh.write_batch(batch)
                 wh.close()
                 wa = pq.ParquetWriter("actions.parquet", schema=Action)
                 for record in actions:
