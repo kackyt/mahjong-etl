@@ -17,8 +17,8 @@ erDiagram
     bigint index
     bigint honba
     bigint riichibou
+    array(int) ten
     array(int) kazes
-    timestamp started_at
   }
 
   haipais {
@@ -64,7 +64,6 @@ erDiagram
   }
   games {
     string id PK
-    bigint initial_score
     timestamp started_at
   }
 ```
