@@ -1,12 +1,9 @@
-from urllib.parse import urlparse
 from typing import List, Dict, Tuple, Any
 from datetime import datetime
 import xml.etree.ElementTree as ET
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pandas as pd
-import requests
-import gzip
 import re
 import os
 import time
@@ -226,7 +223,7 @@ def nakimentsu(m: int, has_aka: bool) -> Tuple[str, str]:
 
 def parse_document(root: ET.Element, game_id: str, dt: datetime):
     has_aka = False
-    current_kyoku: pa.RecordBatch
+    # current_kyoku: pa.RecordBatch
     kyoku_id: int = int(time.time() * 1000)
     doras: List[int] = []
     action_count: int = 0
@@ -453,89 +450,40 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
     game_players.append(game_player)
 
 
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
-}
-r = requests.get("https://tenhou.net/sc/raw/list.cgi", headers=headers)
-
-atag = re.compile(r"<a\s+href=[\"'](?P<href>.*?)[\"']")
-
-DOWNLOAD_PREFIX = "https://tenhou.net/sc/raw/dat/"
-
-text = r.text.replace("list([\r\n", "").replace(");", "")
-files = text.split(",\r\n")
-
-for archive_item in files:
-    if "scc" in archive_item:
-        archive_name = archive_item.split("',")[0].replace("{file:'", "")
-
-        file_name = archive_name
-
-        print(f"Downloading {file_name}")
-        url = os.path.join(DOWNLOAD_PREFIX, file_name)
-
-        # ファイル名から日付(yyyymmdd)を取り出す
-        dtstr = re.search(r"\d{8}", file_name)
-
-        if dtstr is None:
-            raise Exception("date cannot found")
-        dt = datetime.strptime(dtstr[0], r"%Y%m%d")
-
-        print(dt)
-
-        page = requests.get(url, headers=headers)
-
-        data = gzip.decompress(page.content).decode("utf-8")
-
-        lines = data.split("\r\n")
-
-        for line in lines:
-            m = atag.search(line)
-            if m is not None:
-                href = m.group("href")
-                u = urlparse(href)
-
-                log_id = u.query.split("=")[1]
-                url = f"https://tenhou.net/0/log/?{log_id}"
-                print(f"\tDownload {url}")
-
-                log_file = requests.get(url, headers=headers)
-
-                doc = ET.fromstring(log_file.text)
-
-                os.makedirs(f"logs/{dtstr[0]}", exist_ok=True)
-
-                with open(f"logs/{dtstr[0]}/{log_id}.xml", "w") as f:
-                    f.write(log_file.text)
-
-                parse_document(doc, log_id, dt)
-                wp = pq.ParquetWriter("players.parquet", schema=Player)
-                for record in players:
-                    wp.write_batch(record)
-                wp.close()
-                wg = pq.ParquetWriter("games.parquet", schema=Game)
-                for record in games:
-                    wg.write_batch(record)
-                wg.close()
-                wgp = pq.ParquetWriter("game_players.parquet", schema=GamePlayer)
-                for record in game_players:
-                    wgp.write_batch(record)
-                wgp.close()
-                wk = pq.ParquetWriter("kyokus.parquet", schema=Kyoku)
-                batch = pa.RecordBatch.from_pandas(pd.DataFrame(kyokus), schema=Kyoku)
-                wk.write_batch(batch)
-                wk.close()
-                wh = pq.ParquetWriter("haipais.parquet", schema=Haipai)
-                batch = pa.RecordBatch.from_pandas(pd.DataFrame(haipais), schema=Haipai)
-                wh.write_batch(batch)
-                wh.close()
-                wa = pq.ParquetWriter("actions.parquet", schema=Action)
-                for record in actions:
-                    wa.write_batch(record)
-                wa.close()
-                if len(nagares) > 0:
-                    wn = pq.ParquetWriter("nagares.parquet", schema=Nagare)
-                    batch = pa.RecordBatch.from_pandas(pd.DataFrame(nagares), schema=Nagare)
-                    wn.write_batch(batch)
-                    wn.close()
-        break
+def save_to_parquet(basedir: str):
+    wp = pq.ParquetWriter(os.path.join(basedir, "players.parquet"), schema=Player)
+    for record in players:
+        wp.write_batch(record)
+    wp.close()
+    wg = pq.ParquetWriter("games.parquet", schema=Game)
+    for record in games:
+        wg.write_batch(record)
+    wg.close()
+    wgp = pq.ParquetWriter("game_players.parquet", schema=GamePlayer)
+    for record in game_players:
+        wgp.write_batch(record)
+    wgp.close()
+    wk = pq.ParquetWriter("kyokus.parquet", schema=Kyoku)
+    batch = pa.RecordBatch.from_pandas(pd.DataFrame(kyokus), schema=Kyoku)
+    wk.write_batch(batch)
+    wk.close()
+    wh = pq.ParquetWriter("haipais.parquet", schema=Haipai)
+    batch = pa.RecordBatch.from_pandas(pd.DataFrame(haipais), schema=Haipai)
+    wh.write_batch(batch)
+    wh.close()
+    wa = pq.ParquetWriter("actions.parquet", schema=Action)
+    for record in actions:
+        wa.write_batch(record)
+    wa.close()
+    if len(nagares) > 0:
+        wn = pq.ParquetWriter("nagares.parquet", schema=Nagare)
+        batch = pa.RecordBatch.from_pandas(pd.DataFrame(nagares), schema=Nagare)
+        wn.write_batch(batch)
+        wn.close()
+    players.clear()
+    games.clear()
+    game_players.clear()
+    kyokus.clear()
+    haipais.clear()
+    actions.clear()
+    nagares.clear()
