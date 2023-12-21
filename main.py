@@ -4,6 +4,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 
+from tqdm import tqdm
 from extractor import extract_latest_logs
 from scrape import parse_document, save_to_parquet
 
@@ -25,12 +26,15 @@ else:
     for dir in os.listdir(args.log_dir):
         path = os.path.join(args.log_dir, dir)
         if DATEPATTERN.match(dir) and os.path.isdir(path):
+            print(f"run {dir}")
             dt = datetime.strptime(dir, r"%Y%m%d")
-            for file in os.listdir(path):
+            for file in tqdm(os.listdir(path)):
                 filepath = os.path.join(path, file)
                 if os.path.isfile(filepath):
                     game_id, _ = os.path.splitext(file)
                     tree = ET.parse(filepath)
                     parse_document(tree.getroot(), game_id, dt)
-                    if args.output_dir is not None:
-                        save_to_parquet(args.output_dir)
+            if args.output_dir is not None:
+                output_with_date = os.path.join(args.output_dir, dir)
+                os.makedirs(output_with_date, exist_ok=True)
+                save_to_parquet(output_with_date)
