@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Set
 from datetime import datetime
 import xml.etree.ElementTree as ET
 import pyarrow as pa
@@ -71,13 +71,13 @@ Nagare = pa.schema([
     pa.field("score_diff", pa.list_(pa.int32(), 4))
 ])
 
-players: Dict[str, pa.RecordBatch] = {}
+players: Set[str] = set()
 games: List[Dict[str, Any]] = []
-game_players: List[pa.RecordBatch] = []
+game_players: List[Dict[str, Any]] = []
 kyokus: List[Dict[str, Any]] = []
 haipais: List[Dict[str, Any]] = []
 actions: List[Dict[str, Any]] = []
-agaris: List[pa.RecordBatch] = []
+agaris: List[Dict[str, Any]] = []
 nagares: List[Dict[str, Any]] = []
 
 yaku_table = [
@@ -359,22 +359,21 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
 
             uradoras = list(map(lambda x: int(x), u.split(","))) if u is not None else []
 
-            agari = pa.RecordBatch.from_arrays([
-                pa.array([kyoku_id]),
-                pa.array([machi]),
-                pa.array([score]),
-                pa.array([fu]),
-                pa.array([han]),
-                pa.array([",".join(tehais)]),
-                pa.array([yaku_names]),
-                pa.array([dora_str]),
-                pa.array([dora_hai(uradoras)]),
-                pa.array([who]),
-                pa.array([fromWho]),
-                pa.array([scs]),
-                pa.array([owari]),
-            ], schema=Agari)
-            agaris.append(agari)
+            agaris.append({
+                "kyoku_id": kyoku_id,
+                "machihai": num_to_hai([machi], has_aka),
+                "score": score,
+                "fu": fu,
+                "han": han,
+                "tehai": ",".join(tehais),
+                "yaku": yaku_names,
+                "dora": dora_str,
+                "uradora": dora_hai(uradoras),
+                "who": who,
+                "by": fromWho,
+                "score_diff": scs,
+                "owari": owari
+            })
         elif child.tag == "RYUUKYOKU":
             sc = list(map(lambda x: int(x) * 100, child.attrib["sc"].split(",")))
             scs = [sc[1], sc[3], sc[5], sc[7]]
@@ -438,26 +437,29 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
                 "pais": p
             })
             action_count += 1
-    game_player = pa.RecordBatch.from_arrays([
-        pa.array([game_id] * len(player_name)),
-        pa.array([name[0] for name in sorted(player_name.items())]),
-        pa.array(list(range(len(player_name))))
-    ], schema=GamePlayer)
-    game_players.append(game_player)
+    for name in player_name.values():
+        players.add(name)
+
+    for idx, key in enumerate(sorted(player_name.items())):
+        game_players.append({
+            "game_id": game_id,
+            "player_name": key[1],
+            "player_index": idx
+        })
 
 
 def save_to_parquet(basedir: str):
     wp = pq.ParquetWriter(os.path.join(basedir, "players.parquet"), schema=Player)
-    for record in players:
-        wp.write_batch(record)
+    batch = pa.RecordBatch.from_pandas(pd.DataFrame([{"name": name} for name in players]), schema=Player)
+    wp.write_batch(batch)
     wp.close()
     wg = pq.ParquetWriter(os.path.join(basedir, "games.parquet"), schema=Game)
     batch = pa.RecordBatch.from_pandas(pd.DataFrame(games), schema=Game)
     wg.write_batch(batch)
     wg.close()
     wgp = pq.ParquetWriter(os.path.join(basedir, "game_players.parquet"), schema=GamePlayer)
-    for record in game_players:
-        wgp.write_batch(record)
+    batch = pa.RecordBatch.from_pandas(pd.DataFrame(game_players), schema=GamePlayer)
+    wgp.write_batch(batch)
     wgp.close()
     wk = pq.ParquetWriter(os.path.join(basedir, "kyokus.parquet"), schema=Kyoku)
     batch = pa.RecordBatch.from_pandas(pd.DataFrame(kyokus), schema=Kyoku)
@@ -471,6 +473,11 @@ def save_to_parquet(basedir: str):
     batch = pa.RecordBatch.from_pandas(pd.DataFrame(actions), schema=Action)
     wa.write_batch(batch)
     wa.close()
+    if len(agaris) > 0:
+        wag = pq.ParquetWriter(os.path.join(basedir, "agaris.parquet"), schema=Agari)
+        batch = pa.RecordBatch.from_pandas(pd.DataFrame(agaris), schema=Agari)
+        wag.write_batch(batch)
+        wag.close()
     if len(nagares) > 0:
         wn = pq.ParquetWriter(os.path.join(basedir, "nagares.parquet"), schema=Nagare)
         batch = pa.RecordBatch.from_pandas(pd.DataFrame(nagares), schema=Nagare)
@@ -482,4 +489,5 @@ def save_to_parquet(basedir: str):
     kyokus.clear()
     haipais.clear()
     actions.clear()
+    agaris.clear()
     nagares.clear()
