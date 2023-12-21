@@ -1,5 +1,5 @@
 from urllib.parse import urlparse
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Optional
 from datetime import datetime
 import xml.etree.ElementTree as ET
 import pyarrow as pa
@@ -10,7 +10,7 @@ import gzip
 import re
 import os
 
-from scrape import parse_document
+from scrape import parse_document, save_to_parquet
 
 
 headers = {
@@ -20,12 +20,13 @@ headers = {
 DOWNLOAD_PREFIX = "https://tenhou.net/sc/raw/dat/"
 
 
-def extract_latest_logs(enable_transform: bool):
+def extract_latest_logs(log_dir: str, output_dir: Optional[str]):
     r = requests.get("https://tenhou.net/sc/raw/list.cgi", headers=headers)
     atag = re.compile(r"<a\s+href=[\"'](?P<href>.*?)[\"']")
 
     text = r.text.replace("list([\r\n", "").replace(");", "")
     files = text.split(",\r\n")
+    prev_dt = None
 
     for archive_item in files:
         if "scc" in archive_item:
@@ -43,7 +44,9 @@ def extract_latest_logs(enable_transform: bool):
                 raise Exception("date cannot found")
             dt = datetime.strptime(dtstr[0], r"%Y%m%d")
 
-            print(dt)
+            if output_dir is not None and prev_dt is not None and prev_dt != dt:
+                save_to_parquet(output_dir, prev_dt)
+            prev_dt = dt
 
             page = requests.get(url, headers=headers)
 
@@ -62,11 +65,11 @@ def extract_latest_logs(enable_transform: bool):
                     print(f"\tDownload {url}")
 
                     log_file = requests.get(url, headers=headers)
-                    os.makedirs(f"logs/{dtstr[0]}", exist_ok=True)
+                    os.makedirs(os.path.join(log_dir, dtstr[0]), exist_ok=True)
 
-                    with open(f"logs/{dtstr[0]}/{log_id}.xml", "w") as f:
+                    with open(os.path.join(log_dir, dtstr[0], f"{log_id}.xml"), "w") as f:
                         f.write(log_file.text)
 
-                    if enable_transform:
+                    if output_dir is not None:
                         doc = ET.fromstring(log_file.text)
                         parse_document(doc, log_id, dt)

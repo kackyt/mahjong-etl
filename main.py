@@ -17,9 +17,7 @@ parser.add_argument("--output-dir", "-O", help="transform log and output directo
 args = parser.parse_args()
 
 if args.download:
-    extract_latest_logs(args.output_dir is not None)
-    if args.output_dir is not None:
-        save_to_parquet(args.output_dir)
+    extract_latest_logs(args.log_dir, args.output_dir)
 else:
     # use local dir
     DATEPATTERN = re.compile(r"\d{8}")
@@ -35,6 +33,4 @@ else:
                     tree = ET.parse(filepath)
                     parse_document(tree.getroot(), game_id, dt)
             if args.output_dir is not None:
-                output_with_date = os.path.join(args.output_dir, dir)
-                os.makedirs(output_with_date, exist_ok=True)
-                save_to_parquet(output_with_date)
+                save_to_parquet(args.output_dir, dt)
