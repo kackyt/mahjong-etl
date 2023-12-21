@@ -72,11 +72,11 @@ Nagare = pa.schema([
 ])
 
 players: Dict[str, pa.RecordBatch] = {}
-games: List[pa.RecordBatch] = []
+games: List[Dict[str, Any]] = []
 game_players: List[pa.RecordBatch] = []
 kyokus: List[Dict[str, Any]] = []
 haipais: List[Dict[str, Any]] = []
-actions: List[pa.RecordBatch] = []
+actions: List[Dict[str, Any]] = []
 agaris: List[pa.RecordBatch] = []
 nagares: List[Dict[str, Any]] = []
 
@@ -234,11 +234,10 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
     dt64 = pa.scalar(dt, type=pa.date64())
     player_name: Dict[str, str] = {}
 
-    game = pa.RecordBatch.from_arrays([
-        pa.array([game_id]),
-        pa.array([dt64]),
-    ], schema=Game)
-    games.append(game)
+    games.append({
+        "id": game_id,
+        "started_at": dt64
+    })
     for child in root:
         if child.tag == "GO":
             tp = int(child.attrib["type"])
@@ -281,6 +280,7 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
             doras.append(dora)
             kyoku_id = int(time.time() * 1000)
             scores = list(map(lambda x: int(x) * 100, child.attrib["ten"].split(",")))
+            action_count = 0
 
             kyokus.append({
                 "id": kyoku_id,
@@ -392,15 +392,13 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
             who = int(child.attrib["who"])
             paist, atype = nakimentsu(int(child.attrib["m"]), has_aka)
 
-            action = pa.RecordBatch.from_arrays([
-                pa.array([kyoku_id]),
-                pa.array([who]),
-                pa.array([action_count]),
-                pa.array([atype]),
-                pa.array([paist])
-            ], schema=Action)
-
-            actions.append(action)
+            actions.append({
+                "kyoku_id": kyoku_id,
+                "player_index": who,
+                "seq": action_count,
+                "type": atype,
+                "pais": paist
+            })
             action_count += 1
             if atype == "kan":
                 kan = True
@@ -412,14 +410,13 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
 
             typ = "tsumo_k" if kan else "tsumo"
 
-            action = pa.RecordBatch.from_arrays([
-                pa.array([kyoku_id]),
-                pa.array([who]),
-                pa.array([action_count]),
-                pa.array([typ]),
-                pa.array([p])
-            ], schema=Action)
-            actions.append(action)
+            actions.append({
+                "kyoku_id": kyoku_id,
+                "player_index": who,
+                "seq": action_count,
+                "type": typ,
+                "pais": p
+            })
             action_count += 1
             kan = False
         elif re.match(r"^[DEFG]\d+$", child.tag):
@@ -433,14 +430,13 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
             if reach:
                 p += "*"
             reach = False
-            action = pa.RecordBatch.from_arrays([
-                pa.array([kyoku_id]),
-                pa.array([who]),
-                pa.array([action_count]),
-                pa.array(["sutehai"]),
-                pa.array([p])
-            ], schema=Action)
-            actions.append(action)
+            actions.append({
+                "kyoku_id": kyoku_id,
+                "player_index": who,
+                "seq": action_count,
+                "type": "sutehai",
+                "pais": p
+            })
             action_count += 1
     game_player = pa.RecordBatch.from_arrays([
         pa.array([game_id] * len(player_name)),
@@ -455,28 +451,28 @@ def save_to_parquet(basedir: str):
     for record in players:
         wp.write_batch(record)
     wp.close()
-    wg = pq.ParquetWriter("games.parquet", schema=Game)
-    for record in games:
-        wg.write_batch(record)
+    wg = pq.ParquetWriter(os.path.join(basedir, "games.parquet"), schema=Game)
+    batch = pa.RecordBatch.from_pandas(pd.DataFrame(games), schema=Game)
+    wg.write_batch(batch)
     wg.close()
-    wgp = pq.ParquetWriter("game_players.parquet", schema=GamePlayer)
+    wgp = pq.ParquetWriter(os.path.join(basedir, "game_players.parquet"), schema=GamePlayer)
     for record in game_players:
         wgp.write_batch(record)
     wgp.close()
-    wk = pq.ParquetWriter("kyokus.parquet", schema=Kyoku)
+    wk = pq.ParquetWriter(os.path.join(basedir, "kyokus.parquet"), schema=Kyoku)
     batch = pa.RecordBatch.from_pandas(pd.DataFrame(kyokus), schema=Kyoku)
     wk.write_batch(batch)
     wk.close()
-    wh = pq.ParquetWriter("haipais.parquet", schema=Haipai)
+    wh = pq.ParquetWriter(os.path.join(basedir, "haipais.parquet"), schema=Haipai)
     batch = pa.RecordBatch.from_pandas(pd.DataFrame(haipais), schema=Haipai)
     wh.write_batch(batch)
     wh.close()
-    wa = pq.ParquetWriter("actions.parquet", schema=Action)
-    for record in actions:
-        wa.write_batch(record)
+    wa = pq.ParquetWriter(os.path.join(basedir, "actions.parquet"), schema=Action)
+    batch = pa.RecordBatch.from_pandas(pd.DataFrame(actions), schema=Action)
+    wa.write_batch(batch)
     wa.close()
     if len(nagares) > 0:
-        wn = pq.ParquetWriter("nagares.parquet", schema=Nagare)
+        wn = pq.ParquetWriter(os.path.join(basedir, "nagares.parquet"), schema=Nagare)
         batch = pa.RecordBatch.from_pandas(pd.DataFrame(nagares), schema=Nagare)
         wn.write_batch(batch)
         wn.close()
