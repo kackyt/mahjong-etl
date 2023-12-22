@@ -1,5 +1,5 @@
 import argparse
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import re
 import xml.etree.ElementTree as ET
@@ -25,7 +25,7 @@ else:
         path = os.path.join(args.log_dir, dir)
         if DATEPATTERN.match(dir) and os.path.isdir(path):
             print(f"run {dir}")
-            dt = datetime.strptime(dir, r"%Y%m%d")
+            dt = datetime.strptime(dir, r"%Y%m%d").replace(tzinfo=timezone.utc)
             seqno = 0
             for file in tqdm(os.listdir(path)):
                 filepath = os.path.join(path, file)

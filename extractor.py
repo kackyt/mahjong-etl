@@ -1,6 +1,6 @@
 from urllib.parse import urlparse
 from typing import List, Dict, Tuple, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import xml.etree.ElementTree as ET
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -43,7 +43,7 @@ def extract_latest_logs(log_dir: str, output_dir: Optional[str]):
 
             if dtstr is None:
                 raise Exception("date cannot found")
-            dt = datetime.strptime(dtstr[0], r"%Y%m%d")
+            dt = datetime.strptime(dtstr[0], r"%Y%m%d").replace(tzinfo=timezone.utc)
 
             if output_dir is not None and prev_dt is not None and prev_dt != dt:
                 save_to_parquet(output_dir, prev_dt)

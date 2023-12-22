@@ -166,12 +166,13 @@ def nakimentsu(m: int, has_aka: bool) -> Tuple[str, str]:
         pn = pt // 3
         s = colors[pn // 7]
         n = pn % 7 + 1
+        nn = [n, n+1, n+2]
         pai_ids = [m & 0x0018, m & 0x0060, m & 0x0180]
 
         pais: List[str] = []
         for i in range(3):
-            x = str(pai_ids[i])
-            if has_aka and pai_ids[i] == 0 and n + i == 5:
+            x = str(nn[i])
+            if has_aka and pai_ids[i] == 0 and nn[i] == 5:
                 x = "0"
             if i == r:
                 x = x + d
