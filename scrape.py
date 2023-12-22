@@ -351,10 +351,13 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
                 han += 13
 
             for ind in range(0, len(yaku), 2):
-                yaku_stats.append({
-                    "name": yaku_table[int(yaku[ind])],
-                    "han": int(yaku[ind+1])})
-                han += int(yaku[ind+1])
+                cnt = int(yaku[ind+1])
+
+                if cnt > 0:
+                    yaku_stats.append({
+                        "name": yaku_table[int(yaku[ind])],
+                        "han": cnt})
+                    han += cnt
 
             score = int(ten[1])
 
