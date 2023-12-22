@@ -16,6 +16,12 @@ Player = pa.schema([
 
 Game = pa.schema([
     pa.field("id", pa.string()),
+    pa.field("tonpu", pa.bool_()),
+    pa.field("ariari", pa.bool_()),
+    pa.field("has_aka", pa.bool_()),
+    pa.field("demo", pa.bool_()),
+    pa.field("soku", pa.bool_()),
+    pa.field("level", pa.int32()),
     pa.field("started_at", pa.date64())
 ])
 
@@ -239,10 +245,6 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
     dt64 = pa.scalar(dt, type=pa.date64())
     player_name: Dict[str, str] = {}
 
-    games.append({
-        "id": game_id,
-        "started_at": dt64
-    })
     for child in root:
         if child.tag == "GO":
             tp = int(child.attrib["type"])
@@ -251,6 +253,17 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
                 has_aka = True
             else:
                 has_aka = False
+            games.append({
+                "id": game_id,
+                "tonpu": (tp & 0x08) == 0,
+                "ariari": (tp & 0x04) == 0,
+                "sanma": (tp & 0x10) != 0,
+                "demo": (tp & 0x01) == 0,
+                "soku": (tp & 0x40) != 0,
+                "has_aka": has_aka,
+                "level": (tp & 0x20) >> 4 | (tp & 0x80) >> 7,
+                "started_at": dt64
+            })
         elif child.tag == "UN":
             n0 = child.attrib.get("n0")
             n1 = child.attrib.get("n1")

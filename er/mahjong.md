@@ -9,27 +9,27 @@ erDiagram
   kyokus ||--o| nagares : ""
 
   players {
-    varchar(255) name PK
+    string name PK
   }
   kyokus {
     bigint id PK
     string game_id FK
-    bigint index
-    bigint honba
-    bigint riichibou
+    int kyoku_num
+    int honba
+    int riichibou
     array(int) ten
     array(int) kazes
   }
 
   haipais {
     bigint kyoku_id PK,FK
-    bigint player_index
+    int player_index
     string haipai
   }
 
   actions {
     bigint kyoku_id PK,FK
-    bigint player_index
+    int player_index
     int seq
     string type
     string pais
@@ -37,18 +37,18 @@ erDiagram
 
   agaris {
     bigint kyoku_id PK,FK
-    bigint machi_no
-    bigint ten
-    bigint fu
-    bigint han
+    string machihai
+    int ten
+    int fu
+    int han
     string tehai
     array(string) yaku
     array(int) dorahai
     array(int) uradora
     int who
-    int from
+    int by
     array(int) score_diff
-    int owari
+    bool owari
   }
 
   nagares {
@@ -58,12 +58,17 @@ erDiagram
   }
 
   game_players {
-    bigint game_id PK, FK
+    string game_id PK, FK
     string player_name
-    bigint player_index
+    int player_index
   }
   games {
     string id PK
+    bool tonpu
+    bool ariari
+    bool has_aka
+    bool demo
+    int level
     timestamp started_at
   }
 ```
