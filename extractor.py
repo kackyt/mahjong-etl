@@ -27,6 +27,7 @@ def extract_latest_logs(log_dir: str, output_dir: Optional[str]):
     text = r.text.replace("list([\r\n", "").replace(");", "")
     files = text.split(",\r\n")
     prev_dt = None
+    seqno = 0
 
     for archive_item in files:
         if "scc" in archive_item:
@@ -46,6 +47,7 @@ def extract_latest_logs(log_dir: str, output_dir: Optional[str]):
 
             if output_dir is not None and prev_dt is not None and prev_dt != dt:
                 save_to_parquet(output_dir, prev_dt)
+                seqno = 0
             prev_dt = dt
 
             page = requests.get(url, headers=headers)
@@ -72,4 +74,4 @@ def extract_latest_logs(log_dir: str, output_dir: Optional[str]):
 
                     if output_dir is not None:
                         doc = ET.fromstring(log_file.text)
-                        parse_document(doc, log_id, dt)
+                        seqno = parse_document(doc, log_id, dt, seqno)

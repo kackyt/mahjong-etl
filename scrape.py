@@ -224,10 +224,11 @@ def nakimentsu(m: int, has_aka: bool) -> Tuple[str, str]:
     return paist, atype
 
 
-def parse_document(root: ET.Element, game_id: str, dt: datetime):
+def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> int:
     has_aka = False
     # current_kyoku: pa.RecordBatch
-    kyoku_id: int = int(time.time() * 1000)
+    # 局idはuniqueにするため、日付 * 100000 + seqno で定義する
+    kyoku_id: int = 0
     doras: List[int] = []
     action_count: int = 0
     reach = False
@@ -281,7 +282,8 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
             kan = False
             reach = False
             doras.append(dora)
-            kyoku_id = int(time.time() * 1000)
+            kyoku_id = int(dt.timestamp() / (24 * 3600) * 100000) + seqno
+            seqno += 1
             scores = list(map(lambda x: int(x) * 100, child.attrib["ten"].split(",")))
             action_count = 0
 
@@ -451,6 +453,8 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
             "player_name": key[1],
             "player_index": idx
         })
+
+    return seqno
 
 
 def save_to_parquet(basedir: str, dt: datetime):
