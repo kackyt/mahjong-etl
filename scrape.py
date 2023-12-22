@@ -48,7 +48,10 @@ Agari = pa.schema([
     pa.field("fu", pa.int32()),
     pa.field("han", pa.int32()),
     pa.field("tehai", pa.string()),
-    pa.field("yaku", pa.list_(pa.string())),
+    pa.field("yaku", pa.list_(pa.struct([
+      ("name", pa.string()),
+      ("han", pa.int32()),
+      ]))),
     pa.field("dora", pa.list_(pa.string())),
     pa.field("uradora", pa.list_(pa.string())),
     pa.field("who", pa.int32()),
@@ -314,7 +317,7 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
             sc = list(map(lambda x: int(x) * 100, child.attrib["sc"].split(",")))
             yakustr = child.attrib.get("yaku")
             yaku = yakustr.split(",") if yakustr is not None else []
-            yaku_names: List[str] = []
+            yaku_stats: List[Dict[str, Any]] = []
             yakumanstr = child.attrib.get("yakuman")
             yakuman = yakumanstr.split(",") if yakumanstr is not None else []
             who = int(child.attrib["who"])
@@ -342,11 +345,13 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
             han = 0
 
             for item in yakuman:
-                yaku_names.append(yaku_table[int(item)])
-                han = 13
+                yaku_stats.append({"name": yaku_table[int(item)], "han": 0})
+                han += 13
 
             for ind in range(0, len(yaku), 2):
-                yaku_names.append(yaku_table[int(yaku[ind])])
+                yaku_stats.append({
+                    "name": yaku_table[int(yaku[ind])],
+                    "han": int(yaku[ind+1])})
                 han += int(yaku[ind+1])
 
             score = int(ten[1])
@@ -366,7 +371,7 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime):
                 "fu": fu,
                 "han": han,
                 "tehai": ",".join(tehais),
-                "yaku": yaku_names,
+                "yaku": yaku_stats,
                 "dora": dora_str,
                 "uradora": dora_hai(uradoras),
                 "who": who,
