@@ -57,8 +57,15 @@ erDiagram
     array(int) score_diff
   }
 
+  game_scores {
+    string game_id FK
+    int player_index
+    int score
+    decimal point
+  }
+
   game_players {
-    string game_id PK, FK
+    string game_id FK
     string player_name
     int player_index
   }
@@ -68,6 +75,7 @@ erDiagram
     bool ariari
     bool has_aka
     bool demo
+    bool soku
     int level
     timestamp started_at
   }

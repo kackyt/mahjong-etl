@@ -6,7 +6,7 @@ import pyarrow.parquet as pq
 import pandas as pd
 import re
 import os
-import time
+import decimal
 import urllib.parse
 
 # parquetに書き出すテーブルおよびレコード
@@ -29,6 +29,13 @@ GamePlayer = pa.schema([
     pa.field("game_id", pa.string()),
     pa.field("player_name", pa.string()),
     pa.field("player_index", pa.int32())
+])
+
+GameScore = pa.schema([
+    pa.field("game_id", pa.string()),
+    pa.field("player_index", pa.int32()),
+    pa.field("score", pa.int32()),
+    pa.field("point", pa.decimal128(4, 1)),
 ])
 
 Kyoku = pa.schema([
@@ -83,6 +90,7 @@ Nagare = pa.schema([
 players: Set[str] = set()
 games: List[Dict[str, Any]] = []
 game_players: List[Dict[str, Any]] = []
+game_scores: List[Dict[str, Any]] = []
 kyokus: List[Dict[str, Any]] = []
 haipais: List[Dict[str, Any]] = []
 actions: List[Dict[str, Any]] = []
@@ -338,7 +346,7 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
             yakuman = yakumanstr.split(",") if yakumanstr is not None else []
             who = int(child.attrib["who"])
             fromWho = int(child.attrib["fromWho"])
-            owari = child.attrib.get("owari") is not None
+            owari = child.attrib.get("owari")
 
             machi = int(child.attrib["machi"])
 
@@ -396,8 +404,19 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
                 "who": who,
                 "by": fromWho,
                 "score_diff": scs,
-                "owari": owari
+                "owari": owari is not None
             })
+
+            if owari is not None:
+                # ゲームのスコア
+                owaris = owari.split(",")
+                for idx in range(0, len(owaris), 2):
+                    game_scores.append({
+                        "game_id": game_id,
+                        "player_index": idx // 2,
+                        "score": int(owaris[idx]) * 100,
+                        "point": decimal.Decimal(owaris[idx+1])
+                    })
         elif child.tag == "RYUUKYOKU":
             sc = list(map(lambda x: int(x) * 100, child.attrib["sc"].split(",")))
             scs = [sc[1], sc[3], sc[5], sc[7]]
@@ -479,6 +498,7 @@ def save_to_parquet(basedir: str, dt: datetime):
     os.makedirs(os.path.join(basedir, "players", datestr), exist_ok=True)
     os.makedirs(os.path.join(basedir, "games", datestr), exist_ok=True)
     os.makedirs(os.path.join(basedir, "game_players", datestr), exist_ok=True)
+    os.makedirs(os.path.join(basedir, "game_scores", datestr), exist_ok=True)
     os.makedirs(os.path.join(basedir, "kyokus", datestr), exist_ok=True)
     os.makedirs(os.path.join(basedir, "haipais", datestr), exist_ok=True)
     os.makedirs(os.path.join(basedir, "actions", datestr), exist_ok=True)
@@ -496,6 +516,10 @@ def save_to_parquet(basedir: str, dt: datetime):
     batch = pa.RecordBatch.from_pandas(pd.DataFrame(game_players), schema=GamePlayer)
     wgp.write_batch(batch)
     wgp.close()
+    wgs = pq.ParquetWriter(os.path.join(basedir, "game_scores", datestr, "game_scores.parquet"), schema=GameScore)
+    batch = pa.RecordBatch.from_pandas(pd.DataFrame(game_scores), schema=GameScore)
+    wgs.write_batch(batch)
+    wgs.close()
     wk = pq.ParquetWriter(os.path.join(basedir, "kyokus", datestr, "kyokus.parquet"), schema=Kyoku)
     batch = pa.RecordBatch.from_pandas(pd.DataFrame(kyokus), schema=Kyoku)
     wk.write_batch(batch)
@@ -521,6 +545,7 @@ def save_to_parquet(basedir: str, dt: datetime):
     players.clear()
     games.clear()
     game_players.clear()
+    game_scores.clear()
     kyokus.clear()
     haipais.clear()
     actions.clear()
