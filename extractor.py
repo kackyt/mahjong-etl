@@ -1,10 +1,8 @@
 from urllib.parse import urlparse
-from typing import List, Dict, Tuple, Any, Optional
+from tqdm import tqdm
+from typing import Optional
 from datetime import datetime, timezone
 import xml.etree.ElementTree as ET
-import pyarrow as pa
-import pyarrow.parquet as pq
-import pandas as pd
 import requests
 import gzip
 import re
@@ -56,7 +54,7 @@ def extract_latest_logs(log_dir: str, output_dir: Optional[str]):
 
             lines = data.split("\r\n")
 
-            for line in lines:
+            for line in tqdm(lines):
                 m = atag.search(line)
                 if m is not None:
                     href = m.group("href")
@@ -64,14 +62,22 @@ def extract_latest_logs(log_dir: str, output_dir: Optional[str]):
 
                     log_id = u.query.split("=")[1]
                     url = f"https://tenhou.net/0/log/?{log_id}"
-                    print(f"\tDownload {url}")
-
-                    log_file = requests.get(url, headers=headers)
                     os.makedirs(os.path.join(log_dir, dtstr[0]), exist_ok=True)
 
-                    with open(os.path.join(log_dir, dtstr[0], f"{log_id}.xml"), "w") as f:
-                        f.write(log_file.text)
+                    # ファイルの存在チェック
+                    filepath = os.path.join(log_dir, dtstr[0], f"{log_id}.xml")
 
-                    if output_dir is not None:
-                        doc = ET.fromstring(log_file.text)
-                        seqno = parse_document(doc, log_id, dt, seqno)
+                    if os.path.exists(filepath):
+                        # 存在する場合は読み出す
+                        if output_dir is not None:
+                            tree = ET.parse(filepath)
+                            seqno = parse_document(tree.getroot(), log_id, dt, seqno)
+                    else:
+                        log_file = requests.get(url, headers=headers)
+
+                        with open(filepath, "w") as f:
+                            f.write(log_file.text)
+
+                        if output_dir is not None:
+                            doc = ET.fromstring(log_file.text)
+                            seqno = parse_document(doc, log_id, dt, seqno)
