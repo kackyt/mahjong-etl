@@ -28,7 +28,7 @@ def extract_latest_logs(log_dir: str, output_dir: Optional[str]):
     seqno = 0
 
     for archive_item in files:
-        if "scc" in archive_item:
+        if "html" in archive_item:
             archive_name = archive_item.split("',")[0].replace("{file:'", "")
 
             file_name = archive_name

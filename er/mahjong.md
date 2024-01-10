@@ -3,6 +3,7 @@ erDiagram
   game_players ||--|{ games : ""
   game_players ||--|{ players : ""
   games ||--|{ kyokus : ""
+  games ||--|{ game_scores : ""
   kyokus ||--|{ haipais : ""
   kyokus ||--|{ actions : ""
   kyokus ||--o| agaris : ""
@@ -22,7 +23,7 @@ erDiagram
   }
 
   haipais {
-    bigint kyoku_id PK,FK
+    bigint kyoku_id FK
     int player_index
     string haipai
   }
