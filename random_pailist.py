@@ -1,6 +1,7 @@
 import argparse
 import os
 import pyarrow as pa
+import pyarrow.parquet as pq
 import numpy as np
 
 from datetime import datetime, timezone
@@ -18,19 +19,13 @@ def create_record() -> np.ndarray:
 parser = argparse.ArgumentParser(description="random pailist generator")
 
 parser.add_argument("--number", "-n", help="number of output", type=int, required=True)
-parser.add_argument(
-    "--output-dir", "-O", help="pailist output directory", type=str, required=True
-)
+parser.add_argument("--output-dir", "-O", help="pailist output directory", type=str, required=True)
 
-parser.add_argument(
-    "--batch-size", "-b", help="record batch size", type=int, default=1024
-)
+parser.add_argument("--batch-size", "-b", help="record batch size", type=int, default=1024)
 
 args = parser.parse_args()
 
-Haiyama = pa.schema(
-    [pa.field("kyoku_id", pa.int64()), pa.field("hai_ids", pa.list_(pa.int32(), 136))]
-)
+Haiyama = pa.schema([pa.field("kyoku_id", pa.int64()), pa.field("hai_ids", pa.list_(pa.int32(), 136))])
 
 dt = datetime.now(timezone.utc)
 RANDOM_KYOKU_ID_OFFSET = 900_000_000_000
@@ -47,22 +42,14 @@ for batch in tqdm(range(num_batches)):
     hai_ids: List[np.ndarray] = []
 
     for seqno in range(args.batch_size):
-        kyoku_id = (
-            RANDOM_KYOKU_ID_OFFSET
-            + int(dt.timestamp() / (24 * 3600)) * 100000
-            + seqno
-            + args.batch_size * batch
-        )
+        kyoku_id = RANDOM_KYOKU_ID_OFFSET + int(dt.timestamp() / (24 * 3600)) * 100000 + seqno + args.batch_size * batch
         arr = create_record()
         kyoku_ids.append(kyoku_id)
         hai_ids.append(arr)
 
-    table = pa.Table.from_arrays(
-        [pa.array(kyoku_ids), pa.array(hai_ids)], schema=Haiyama
-    )
+    table = pa.Table.from_arrays([pa.array(kyoku_ids), pa.array(hai_ids)], schema=Haiyama)
 
     filename = f"haiyamas-random-{batch:04d}.parquet"
     filepath = os.path.join(dirname, filename)
-    with pa.OSFile(filepath, "wb") as sink:
-        with pa.RecordBatchFileWriter(sink, Haiyama) as writer:
-            writer.write_table(table)
+    with pq.ParquetWriter(filepath, schema=Haiyama) as writer:
+        writer.write_table(table)

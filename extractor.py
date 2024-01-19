@@ -11,9 +11,7 @@ import os
 from scrape import parse_document, save_to_parquet
 
 
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
-}
+headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"}
 
 DOWNLOAD_PREFIX = "https://tenhou.net/sc/raw/dat/"
 
