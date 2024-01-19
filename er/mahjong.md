@@ -8,6 +8,7 @@ erDiagram
   kyokus ||--|{ actions : ""
   kyokus ||--o| agaris : ""
   kyokus ||--o| nagares : ""
+  kyokus ||--o| haiyamas : ""
 
   players {
     string name PK
@@ -22,10 +23,16 @@ erDiagram
     array(int) kazes
   }
 
+  haiyamas {
+    bigint kyoku_id PK,FK
+    array(int) hai_ids
+  }
+
   haipais {
     bigint kyoku_id FK
     int player_index
     string haipai
+    array(int) hai_ids
   }
 
   actions {
@@ -34,6 +41,7 @@ erDiagram
     int seq
     string type
     string pais
+    array(int) hai_ids
   }
 
   agaris {

@@ -10,82 +10,91 @@ import decimal
 import urllib.parse
 
 # parquetに書き出すテーブルおよびレコード
-Player = pa.schema([
-    pa.field("name", pa.string())
-])
+Player = pa.schema([pa.field("name", pa.string())])
 
-Game = pa.schema([
-    pa.field("id", pa.string()),
-    pa.field("tonpu", pa.bool_()),
-    pa.field("ariari", pa.bool_()),
-    pa.field("has_aka", pa.bool_()),
-    pa.field("demo", pa.bool_()),
-    pa.field("soku", pa.bool_()),
-    pa.field("level", pa.int32()),
-    pa.field("started_at", pa.date64())
-])
+Game = pa.schema(
+    [
+        pa.field("id", pa.string()),
+        pa.field("tonpu", pa.bool_()),
+        pa.field("ariari", pa.bool_()),
+        pa.field("has_aka", pa.bool_()),
+        pa.field("demo", pa.bool_()),
+        pa.field("soku", pa.bool_()),
+        pa.field("level", pa.int32()),
+        pa.field("started_at", pa.date64()),
+    ]
+)
 
-GamePlayer = pa.schema([
-    pa.field("game_id", pa.string()),
-    pa.field("player_name", pa.string()),
-    pa.field("player_index", pa.int32())
-])
+GamePlayer = pa.schema([pa.field("game_id", pa.string()), pa.field("player_name", pa.string()), pa.field("player_index", pa.int32())])
 
-GameScore = pa.schema([
-    pa.field("game_id", pa.string()),
-    pa.field("player_index", pa.int32()),
-    pa.field("score", pa.int32()),
-    pa.field("point", pa.decimal128(4, 1)),
-])
+GameScore = pa.schema(
+    [
+        pa.field("game_id", pa.string()),
+        pa.field("player_index", pa.int32()),
+        pa.field("score", pa.int32()),
+        pa.field("point", pa.decimal128(4, 1)),
+    ]
+)
 
-Kyoku = pa.schema([
-    pa.field("id", pa.int64()),
-    pa.field("game_id", pa.string()),
-    pa.field("kyoku_num", pa.int32()),
-    pa.field("honba", pa.int32()),
-    pa.field("reachbou", pa.int32()),
-    pa.field("scores", pa.list_(pa.int32(), 4)),
-    pa.field("kazes", pa.list_(pa.int32(), 4))
-])
+Kyoku = pa.schema(
+    [
+        pa.field("id", pa.int64()),
+        pa.field("game_id", pa.string()),
+        pa.field("kyoku_num", pa.int32()),
+        pa.field("honba", pa.int32()),
+        pa.field("reachbou", pa.int32()),
+        pa.field("scores", pa.list_(pa.int32(), 4)),
+        pa.field("kazes", pa.list_(pa.int32(), 4)),
+    ]
+)
 
-Haipai = pa.schema([
-    pa.field("kyoku_id", pa.int64()),
-    pa.field("player_index", pa.int32()),
-    pa.field("haipai", pa.string()),
-])
+Haipai = pa.schema(
+    [
+        pa.field("kyoku_id", pa.int64()),
+        pa.field("player_index", pa.int32()),
+        pa.field("haipai", pa.string()),
+    ]
+)
 
-Agari = pa.schema([
-    pa.field("kyoku_id", pa.int64()),
-    pa.field("machihai", pa.string()),
-    pa.field("score", pa.int32()),
-    pa.field("fu", pa.int32()),
-    pa.field("han", pa.int32()),
-    pa.field("tehai", pa.string()),
-    pa.field("yaku", pa.list_(pa.struct([
-      ("name", pa.string()),
-      ("han", pa.int32()),
-      ]))),
-    pa.field("dora", pa.list_(pa.string())),
-    pa.field("uradora", pa.list_(pa.string())),
-    pa.field("who", pa.int32()),
-    pa.field("by", pa.int32()),
-    pa.field("score_diff", pa.list_(pa.int32(), 4)),
-    pa.field("owari", pa.bool_())
-])
+Agari = pa.schema(
+    [
+        pa.field("kyoku_id", pa.int64()),
+        pa.field("machihai", pa.string()),
+        pa.field("score", pa.int32()),
+        pa.field("fu", pa.int32()),
+        pa.field("han", pa.int32()),
+        pa.field("tehai", pa.string()),
+        pa.field(
+            "yaku",
+            pa.list_(
+                pa.struct(
+                    [
+                        ("name", pa.string()),
+                        ("han", pa.int32()),
+                    ]
+                )
+            ),
+        ),
+        pa.field("dora", pa.list_(pa.string())),
+        pa.field("uradora", pa.list_(pa.string())),
+        pa.field("who", pa.int32()),
+        pa.field("by", pa.int32()),
+        pa.field("score_diff", pa.list_(pa.int32(), 4)),
+        pa.field("owari", pa.bool_()),
+    ]
+)
 
-Action = pa.schema([
-    pa.field("kyoku_id", pa.int64()),
-    pa.field("player_index", pa.int32()),
-    pa.field("seq", pa.int32()),
-    pa.field("type", pa.string()),
-    pa.field("pais", pa.string())
-])
+Action = pa.schema(
+    [
+        pa.field("kyoku_id", pa.int64()),
+        pa.field("player_index", pa.int32()),
+        pa.field("seq", pa.int32()),
+        pa.field("type", pa.string()),
+        pa.field("pais", pa.string()),
+    ]
+)
 
-Nagare = pa.schema([
-    pa.field("kyoku_id", pa.int64()),
-    pa.field("name", pa.string()),
-    pa.field("score_diff", pa.list_(pa.int32(), 4))
-])
+Nagare = pa.schema([pa.field("kyoku_id", pa.int64()), pa.field("name", pa.string()), pa.field("score_diff", pa.list_(pa.int32(), 4))])
 
 players: Set[str] = set()
 games: List[Dict[str, Any]] = []
@@ -98,26 +107,70 @@ agaris: List[Dict[str, Any]] = []
 nagares: List[Dict[str, Any]] = []
 
 yaku_table = [
-    '門前清自摸和', '立直', '一発', '槍槓', '嶺上開花',
-    '海底摸月', '河底撈魚', '平和', '断幺九', '一盃口',
-    '自風 東', '自風 南', '自風 西', '自風 北', '場風 東',
-    '場風 南', '場風 西', '場風 北', '役牌 白', '役牌 發',
-    '役牌 中', '両立直', '七対子', '混全帯幺九', '一気通貫',
-    '三色同順', '三色同刻', '三槓子', '対々和', '三暗刻',
-    '小三元', '混老頭', '二盃口', '純全帯幺九', '混一色',
-    '清一色', '', '天和', '地和', '大三元',
-    '四暗刻', '四暗刻単騎', '字一色', '緑一色', '清老頭',
-    '九蓮宝燈', '純正九蓮宝燈', '国士無双', '国士無双１３面', '大四喜',
-    '小四喜', '四槓子', 'ドラ', '裏ドラ', '赤ドラ',
+    "門前清自摸和",
+    "立直",
+    "一発",
+    "槍槓",
+    "嶺上開花",
+    "海底摸月",
+    "河底撈魚",
+    "平和",
+    "断幺九",
+    "一盃口",
+    "自風 東",
+    "自風 南",
+    "自風 西",
+    "自風 北",
+    "場風 東",
+    "場風 南",
+    "場風 西",
+    "場風 北",
+    "役牌 白",
+    "役牌 發",
+    "役牌 中",
+    "両立直",
+    "七対子",
+    "混全帯幺九",
+    "一気通貫",
+    "三色同順",
+    "三色同刻",
+    "三槓子",
+    "対々和",
+    "三暗刻",
+    "小三元",
+    "混老頭",
+    "二盃口",
+    "純全帯幺九",
+    "混一色",
+    "清一色",
+    "",
+    "天和",
+    "地和",
+    "大三元",
+    "四暗刻",
+    "四暗刻単騎",
+    "字一色",
+    "緑一色",
+    "清老頭",
+    "九蓮宝燈",
+    "純正九蓮宝燈",
+    "国士無双",
+    "国士無双１３面",
+    "大四喜",
+    "小四喜",
+    "四槓子",
+    "ドラ",
+    "裏ドラ",
+    "赤ドラ",
 ]
 
 nagare_table = {
-    "nm":     '流し満貫',
-    "yao9":   '九種九牌',
-    "kaze4":  '四風連打',
-    "reach4": '四家立直',
-    "ron3":   '三家和了',
-    "kan4":   '四槓散了',
+    "nm": "流し満貫",
+    "yao9": "九種九牌",
+    "kaze4": "四風連打",
+    "reach4": "四家立直",
+    "ron3": "三家和了",
+    "kan4": "四槓散了",
 }
 
 
@@ -180,7 +233,7 @@ def nakimentsu(m: int, has_aka: bool) -> Tuple[str, str]:
         pn = pt // 3
         s = colors[pn // 7]
         n = pn % 7 + 1
-        nn = [n, n+1, n+2]
+        nn = [n, n + 1, n + 2]
         pai_ids = [m & 0x0018, m & 0x0060, m & 0x0180]
 
         pais: List[str] = []
@@ -215,8 +268,7 @@ def nakimentsu(m: int, has_aka: bool) -> Tuple[str, str]:
             paist = s + "".join(map(lambda x: str(x), nn[0:3])) + d
             atype = "pon"
         else:
-            paist = s + "".join(map(lambda x: str(x), nn[0:3])) + \
-                d + str(nn[3])
+            paist = s + "".join(map(lambda x: str(x), nn[0:3])) + d + str(nn[3])
             atype = "kan"
     else:
         # 暗カンまたは大明槓
@@ -227,7 +279,7 @@ def nakimentsu(m: int, has_aka: bool) -> Tuple[str, str]:
         n = pn % 9 + 1
         nn = [n, n, n, n]
         if has_aka and s != "z" and n == 5:
-            if (d == ""):
+            if d == "":
                 nn[3] = 0
             elif r == 0:
                 nn[3] = 0
@@ -261,17 +313,19 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
                 has_aka = True
             else:
                 has_aka = False
-            games.append({
-                "id": game_id,
-                "tonpu": (tp & 0x08) == 0,
-                "ariari": (tp & 0x04) == 0,
-                "sanma": (tp & 0x10) != 0,
-                "demo": (tp & 0x01) == 0,
-                "soku": (tp & 0x40) != 0,
-                "has_aka": has_aka,
-                "level": (tp & 0x20) >> 4 | (tp & 0x80) >> 7,
-                "started_at": dt64
-            })
+            games.append(
+                {
+                    "id": game_id,
+                    "tonpu": (tp & 0x08) == 0,
+                    "ariari": (tp & 0x04) == 0,
+                    "sanma": (tp & 0x10) != 0,
+                    "demo": (tp & 0x01) == 0,
+                    "soku": (tp & 0x40) != 0,
+                    "has_aka": has_aka,
+                    "level": (tp & 0x20) >> 4 | (tp & 0x80) >> 7,
+                    "started_at": dt64,
+                }
+            )
         elif child.tag == "UN":
             n0 = child.attrib.get("n0")
             n1 = child.attrib.get("n1")
@@ -295,11 +349,7 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
             honba = int(seeds[1])
             reachbou = int(seeds[2])
             dora = int(seeds[5])
-            kaze_table = [
-                [0, 1, 2, 3],
-                [3, 0, 1, 2],
-                [2, 3, 0, 1],
-                [1, 2, 3, 0]]
+            kaze_table = [[0, 1, 2, 3], [3, 0, 1, 2], [2, 3, 0, 1], [1, 2, 3, 0]]
             oya = int(child.attrib["oya"])
             kan = False
             reach = False
@@ -309,29 +359,25 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
             scores = list(map(lambda x: int(x) * 100, child.attrib["ten"].split(",")))
             action_count = 0
 
-            kyokus.append({
-                "id": kyoku_id,
-                "game_id": game_id,
-                "kyoku_num": kyoku_num,
-                "honba": honba,
-                "reachbou": reachbou,
-                "scores": scores,
-                "kazes": kaze_table[oya],
-            })
+            kyokus.append(
+                {
+                    "id": kyoku_id,
+                    "game_id": game_id,
+                    "kyoku_num": kyoku_num,
+                    "honba": honba,
+                    "reachbou": reachbou,
+                    "scores": scores,
+                    "kazes": kaze_table[oya],
+                }
+            )
 
             # 配牌
             for n in range(4):
                 haistr = child.attrib.get(f"hai{n}")
 
                 if haistr is not None and haistr != "":
-                    haipai = num_to_hai(
-                        list(map(lambda x: int(x), haistr.split(","))),
-                        has_aka)
-                    haipais.append({
-                        "kyoku_id": kyoku_id,
-                        "player_index": n,
-                        "haipai": haipai
-                    })
+                    haipai = num_to_hai(list(map(lambda x: int(x), haistr.split(","))), has_aka)
+                    haipais.append({"kyoku_id": kyoku_id, "player_index": n, "haipai": haipai})
         elif child.tag == "DORA":
             _ = 0
         elif child.tag == "REACH":
@@ -350,9 +396,7 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
 
             machi = int(child.attrib["machi"])
 
-            hai_list = list(filter(lambda x: x != machi,
-                                   map(lambda x: int(x),
-                                       child.attrib["hai"].split(","))))
+            hai_list = list(filter(lambda x: x != machi, map(lambda x: int(x), child.attrib["hai"].split(","))))
             hai_list.append(machi)
 
             tehais = [num_to_hai(hai_list, has_aka)]
@@ -362,8 +406,7 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
             if m is not None:
                 ms = m.split(",")
                 ms.reverse()
-                tehais.extend(
-                    list(map(lambda x: nakimentsu(int(x), has_aka)[0], ms)))
+                tehais.extend(list(map(lambda x: nakimentsu(int(x), has_aka)[0], ms)))
 
             fu = int(ten[0])
             han = 0
@@ -373,12 +416,10 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
                 han += 13
 
             for ind in range(0, len(yaku), 2):
-                cnt = int(yaku[ind+1])
+                cnt = int(yaku[ind + 1])
 
                 if cnt > 0:
-                    yaku_stats.append({
-                        "name": yaku_table[int(yaku[ind])],
-                        "han": cnt})
+                    yaku_stats.append({"name": yaku_table[int(yaku[ind])], "han": cnt})
                     han += cnt
 
             score = int(ten[1])
@@ -391,32 +432,31 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
 
             uradoras = list(map(lambda x: int(x), u.split(","))) if u is not None else []
 
-            agaris.append({
-                "kyoku_id": kyoku_id,
-                "machihai": num_to_hai([machi], has_aka),
-                "score": score,
-                "fu": fu,
-                "han": han,
-                "tehai": ",".join(tehais),
-                "yaku": yaku_stats,
-                "dora": dora_str,
-                "uradora": dora_hai(uradoras),
-                "who": who,
-                "by": fromWho,
-                "score_diff": scs,
-                "owari": owari is not None
-            })
+            agaris.append(
+                {
+                    "kyoku_id": kyoku_id,
+                    "machihai": num_to_hai([machi], has_aka),
+                    "score": score,
+                    "fu": fu,
+                    "han": han,
+                    "tehai": ",".join(tehais),
+                    "yaku": yaku_stats,
+                    "dora": dora_str,
+                    "uradora": dora_hai(uradoras),
+                    "who": who,
+                    "by": fromWho,
+                    "score_diff": scs,
+                    "owari": owari is not None,
+                }
+            )
 
             if owari is not None:
                 # ゲームのスコア
                 owaris = owari.split(",")
                 for idx in range(0, len(owaris), 2):
-                    game_scores.append({
-                        "game_id": game_id,
-                        "player_index": idx // 2,
-                        "score": int(owaris[idx]) * 100,
-                        "point": decimal.Decimal(owaris[idx+1])
-                    })
+                    game_scores.append(
+                        {"game_id": game_id, "player_index": idx // 2, "score": int(owaris[idx]) * 100, "point": decimal.Decimal(owaris[idx + 1])}
+                    )
         elif child.tag == "RYUUKYOKU":
             sc = list(map(lambda x: int(x) * 100, child.attrib["sc"].split(",")))
             scs = [sc[1], sc[3], sc[5], sc[7]]
@@ -424,23 +464,13 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
 
             name = nagare_table[typ] if typ is not None and nagare_table.get(typ) is not None else "流局"
 
-            nagares.append({
-                "kyoku_id": kyoku_id,
-                "name": name,
-                "score_diff": scs
-            })
+            nagares.append({"kyoku_id": kyoku_id, "name": name, "score_diff": scs})
         elif child.tag == "N":
             # なき
             who = int(child.attrib["who"])
             paist, atype = nakimentsu(int(child.attrib["m"]), has_aka)
 
-            actions.append({
-                "kyoku_id": kyoku_id,
-                "player_index": who,
-                "seq": action_count,
-                "type": atype,
-                "pais": paist
-            })
+            actions.append({"kyoku_id": kyoku_id, "player_index": who, "seq": action_count, "type": atype, "pais": paist})
             action_count += 1
             if atype == "kan":
                 kan = True
@@ -452,13 +482,7 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
 
             typ = "tsumo_k" if kan else "tsumo"
 
-            actions.append({
-                "kyoku_id": kyoku_id,
-                "player_index": who,
-                "seq": action_count,
-                "type": typ,
-                "pais": p
-            })
+            actions.append({"kyoku_id": kyoku_id, "player_index": who, "seq": action_count, "type": typ, "pais": p})
             action_count += 1
             kan = False
         elif re.match(r"^[DEFG]\d+$", child.tag):
@@ -472,23 +496,13 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
             if reach:
                 p += "*"
             reach = False
-            actions.append({
-                "kyoku_id": kyoku_id,
-                "player_index": who,
-                "seq": action_count,
-                "type": "sutehai",
-                "pais": p
-            })
+            actions.append({"kyoku_id": kyoku_id, "player_index": who, "seq": action_count, "type": "sutehai", "pais": p})
             action_count += 1
     for name in player_name.values():
         players.add(name)
 
     for idx, key in enumerate(sorted(player_name.items())):
-        game_players.append({
-            "game_id": game_id,
-            "player_name": key[1],
-            "player_index": idx
-        })
+        game_players.append({"game_id": game_id, "player_name": key[1], "player_index": idx})
 
     return seqno
 

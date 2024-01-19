@@ -1,3 +1,39 @@
+[tool.black]
+line-length = 150
+target-version = ['py312']
+include = '\.pyi?$'
+exclude = '''
+(
+  /(
+      \.terraform
+    | \.git
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | buck-out
+    | build
+  )
+)
+'''
+
+[tool.isort]
+profile = "black"
+include_trailing_comma = true
+line_length = 150
+multi_line_output = 3
+skip = '''
+.git, .tox, .venv, .eggs, build, dist, docs, .terraform
+'''
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[tool.flake8]
+max-line-length = 150
+extend-ignore = ["E203", "E231", "E722", "W503", "W504", "W605"]
+exclude = [".venv", ".git", ".tox", ".eggs", "build", "dist", "docs", ".terraform", "__pycache__"]
+
 [tool.poetry]
 name = "mahjong-etl"
 version = "0.1.0"
@@ -18,10 +54,13 @@ mypy = "^1.7.1"
 flake8 = "^6.1.0"
 black = "^23.11.0"
 isort = "^5.12.0"
-
+pyproject-flake8 = "^6.1.0"
 
 [tool.poetry.group.types.dependencies]
 types-requests = "^2.31.0.10"
+pandas-stubs = "^2.1.4.231227"
+types-tqdm = "^4.66.0.20240106"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
