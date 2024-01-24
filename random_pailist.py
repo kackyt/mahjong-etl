@@ -25,7 +25,7 @@ parser.add_argument("--batch-size", "-b", help="record batch size", type=int, de
 
 args = parser.parse_args()
 
-Haiyama = pa.schema([pa.field("kyoku_id", pa.int64()), pa.field("hai_ids", pa.list_(pa.int32(), 136))])
+Paiyama = pa.schema([pa.field("kyoku_id", pa.int64()), pa.field("pai_ids", pa.list_(pa.int32(), 136))])
 
 dt = datetime.now(timezone.utc)
 RANDOM_KYOKU_ID_OFFSET = 900_000_000_000
@@ -34,22 +34,22 @@ rng = np.random.default_rng()
 
 num_batches = args.number // args.batch_size
 
-dirname = os.path.join(args.output_dir, "haiyamas", f"dt={dt.strftime(r'%Y-%m-%d')}")
+dirname = os.path.join(args.output_dir, "paiyamas", f"dt={dt.strftime(r'%Y-%m-%d')}")
 os.makedirs(dirname, exist_ok=True)
 
 for batch in tqdm(range(num_batches)):
     kyoku_ids: List[int] = []
-    hai_ids: List[np.ndarray] = []
+    pai_ids: List[np.ndarray] = []
 
     for seqno in range(args.batch_size):
         kyoku_id = RANDOM_KYOKU_ID_OFFSET + int(dt.timestamp() / (24 * 3600)) * 100000 + seqno + args.batch_size * batch
         arr = create_record()
         kyoku_ids.append(kyoku_id)
-        hai_ids.append(arr)
+        pai_ids.append(arr)
 
-    table = pa.Table.from_arrays([pa.array(kyoku_ids), pa.array(hai_ids)], schema=Haiyama)
+    table = pa.Table.from_arrays([pa.array(kyoku_ids), pa.array(pai_ids)], schema=Paiyama)
 
-    filename = f"haiyamas-random-{batch:04d}.parquet"
+    filename = f"paiyamas-random-{batch:04d}.parquet"
     filepath = os.path.join(dirname, filename)
-    with pq.ParquetWriter(filepath, schema=Haiyama) as writer:
+    with pq.ParquetWriter(filepath, schema=Paiyama) as writer:
         writer.write_table(table)

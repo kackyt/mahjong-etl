@@ -59,7 +59,7 @@ Haipai = pa.schema(
 Agari = pa.schema(
     [
         pa.field("kyoku_id", pa.int64()),
-        pa.field("machihai", pa.string()),
+        pa.field("machipai", pa.int32()),
         pa.field("score", pa.int32()),
         pa.field("fu", pa.int32()),
         pa.field("han", pa.int32()),
@@ -75,8 +75,8 @@ Agari = pa.schema(
                 )
             ),
         ),
-        pa.field("dora", pa.list_(pa.string())),
-        pa.field("uradora", pa.list_(pa.string())),
+        pa.field("dora", pa.list_(pa.int32())),
+        pa.field("uradora", pa.list_(pa.int32())),
         pa.field("who", pa.int32()),
         pa.field("by", pa.int32()),
         pa.field("score_diff", pa.list_(pa.int32(), 4)),
@@ -174,11 +174,12 @@ nagare_table = {
 }
 
 
-def dora_hai(num_list: List[int]) -> List[str]:
+def dora_hai(num_list: List[int]) -> List[int]:
     # 表示牌の次
     def nhai(num: int) -> int:
         s = num // 36
         n = (num % 36) // 4
+        i = num % 4
 
         if s == 3:
             n += 1
@@ -190,9 +191,9 @@ def dora_hai(num_list: List[int]) -> List[str]:
             n += 1
             if n >= 9:
                 n = 0
-        return s * 36 + n * 4
+        return s * 36 + n * 4 + i
 
-    return [num_to_hai([nhai(x)], False) for x in num_list]
+    return [nhai(x) for x in num_list]
 
 
 def num_to_hai(num_list: List[int], has_aka: bool) -> str:
@@ -435,7 +436,7 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
             agaris.append(
                 {
                     "kyoku_id": kyoku_id,
-                    "machihai": num_to_hai([machi], has_aka),
+                    "machipai": machi,
                     "score": score,
                     "fu": fu,
                     "han": han,

@@ -23,16 +23,16 @@ erDiagram
     array(int) kazes
   }
 
-  haiyamas {
+  paiyamas {
     bigint kyoku_id PK,FK
-    array(int) hai_ids
+    array(int) pai_ids
   }
 
   haipais {
     bigint kyoku_id FK
     int player_index
     string haipai
-    array(int) hai_ids
+    array(int) pai_ids
   }
 
   actions {
@@ -41,19 +41,21 @@ erDiagram
     int seq
     string type
     string pais
-    array(int) hai_ids
+    array(int) pai_ids
   }
 
   agaris {
     bigint kyoku_id PK,FK
-    string machihai
+    string machipai
     int ten
     int fu
     int han
     string tehai
     array(string) yaku
-    array(int) dorahai
+    array(int) dora
+    array(int) dora_orig
     array(int) uradora
+    array(int) uradora_orig
     int who
     int by
     array(int) score_diff
