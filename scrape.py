@@ -53,17 +53,19 @@ Haipai = pa.schema(
         pa.field("kyoku_id", pa.int64()),
         pa.field("player_index", pa.int32()),
         pa.field("haipai", pa.string()),
+        pa.field("pai_ids", pa.list_(pa.uint32())),
     ]
 )
 
 Agari = pa.schema(
     [
         pa.field("kyoku_id", pa.int64()),
-        pa.field("machihai", pa.string()),
+        pa.field("machipai", pa.int32()),
         pa.field("score", pa.int32()),
         pa.field("fu", pa.int32()),
         pa.field("han", pa.int32()),
         pa.field("tehai", pa.string()),
+        pa.field("pai_ids", pa.list_(pa.uint32())),
         pa.field(
             "yaku",
             pa.list_(
@@ -75,8 +77,10 @@ Agari = pa.schema(
                 )
             ),
         ),
-        pa.field("dora", pa.list_(pa.string())),
-        pa.field("uradora", pa.list_(pa.string())),
+        pa.field("dora", pa.list_(pa.uint32())),
+        pa.field("uradora", pa.list_(pa.uint32())),
+        pa.field("dora_orig", pa.list_(pa.uint32())),
+        pa.field("uradora_orig", pa.list_(pa.uint32())),
         pa.field("who", pa.int32()),
         pa.field("by", pa.int32()),
         pa.field("score_diff", pa.list_(pa.int32(), 4)),
@@ -91,6 +95,7 @@ Action = pa.schema(
         pa.field("seq", pa.int32()),
         pa.field("type", pa.string()),
         pa.field("pais", pa.string()),
+        pa.field("pai_id", pa.uint32()),
     ]
 )
 
@@ -173,12 +178,24 @@ nagare_table = {
     "kan4": "四槓散了",
 }
 
+PAI_TYPE_NONE = 0
+PAI_TYPE_RIICHI = 1
+PAI_TYPE_ANKAN = 2
+PAI_TYPE_TII = 4
+PAI_TYPE_PON = 5
+PAI_TYPE_MINKAN = 6
 
-def dora_hai(num_list: List[int]) -> List[str]:
+
+def create_packed_pai_format(p0: int, p1: int, p2: int, typ: int, by: int, index: int) -> int:
+    return (p0) | (p1 << 8) | (p2 << 16) | (typ << 24) | (by << 27) | (index << 29)
+
+
+def dora_hai(num_list: List[int]) -> List[int]:
     # 表示牌の次
     def nhai(num: int) -> int:
         s = num // 36
         n = (num % 36) // 4
+        i = num % 4
 
         if s == 3:
             n += 1
@@ -190,9 +207,9 @@ def dora_hai(num_list: List[int]) -> List[str]:
             n += 1
             if n >= 9:
                 n = 0
-        return s * 36 + n * 4
+        return s * 36 + n * 4 + i
 
-    return [num_to_hai([nhai(x)], False) for x in num_list]
+    return [nhai(x) for x in num_list]
 
 
 def num_to_hai(num_list: List[int], has_aka: bool) -> str:
@@ -219,42 +236,51 @@ def num_to_hai(num_list: List[int], has_aka: bool) -> str:
     return "".join(pais)
 
 
-def nakimentsu(m: int, has_aka: bool) -> Tuple[str, str]:
+def nakimentsu(m: int, has_aka: bool) -> Tuple[str, str, int]:
     types = ["", "+", "=", "-"]
     colors = ["m", "p", "s", "z"]
-    d = types[m & 0x03]
+    fromWho = m & 0x03
+    d = types[fromWho]
     paist: str
     atype: str
+    packed_pai: int = 0
 
     if (m & 0x0004) != 0:
         # チー
         pt = (m & 0xFC00) >> 10
         r = pt % 3
         pn = pt // 3
-        s = colors[pn // 7]
+        suit = pn // 7
+        s = colors[suit]
         n = pn % 7 + 1
         nn = [n, n + 1, n + 2]
-        pai_ids = [m & 0x0018, m & 0x0060, m & 0x0180]
+        ids = [(m & 0x0018) >> 3, (m & 0x0060) >> 5, (m & 0x0180) >> 7]
 
         pais: List[str] = []
         for i in range(3):
             x = str(nn[i])
-            if has_aka and pai_ids[i] == 0 and nn[i] == 5:
+            if has_aka and ids[i] == 0 and nn[i] == 5:
                 x = "0"
             if i == r:
                 x = x + d
             pais.append(x)
 
         paist = s + "".join(pais)
+        pai_ids = list(map(lambda x: (suit * 9 + x[0]) << 2 + x[1], zip(nn, ids)))
         atype = "tii"
+        packed_pai = create_packed_pai_format(pai_ids[0], pai_ids[1], pai_ids[2], PAI_TYPE_TII, fromWho, r)
     elif (m & 0x0018) != 0:
         # ポン or 加えカン
         pt = (m & 0xFE00) >> 9
         r = pt % 3
         pn = pt // 3
-        s = colors[pn // 9]
+        suit = pn // 9
+        s = colors[suit]
         n = pn % 9 + 1
         nn = [n, n, n, n]
+        ids = [0, 1, 2, 3]
+
+        ids.remove((m & 0x0060) >> 5)
 
         if has_aka and s != "z" and n == 5:
             if (m & 0x0060) == 0:
@@ -264,18 +290,23 @@ def nakimentsu(m: int, has_aka: bool) -> Tuple[str, str]:
             else:
                 nn[1] = 0
 
+        pai_ids = list(map(lambda x: (suit * 9 + n) << 2 + x, ids))
+
         if (m & 0x0008) != 0:
             paist = s + "".join(map(lambda x: str(x), nn[0:3])) + d
             atype = "pon"
+            packed_pai = create_packed_pai_format(pai_ids[0], pai_ids[1], pai_ids[2], PAI_TYPE_PON, fromWho, r)
         else:
             paist = s + "".join(map(lambda x: str(x), nn[0:3])) + d + str(nn[3])
             atype = "kan"
+            packed_pai = create_packed_pai_format((suit * 9 + n) << 2, 0, 0, PAI_TYPE_MINKAN, fromWho, r)
     else:
         # 暗カンまたは大明槓
         pt = m >> 8
         r = pt % 4
         pn = pt // 4
-        s = colors[pn // 9]
+        suit = pn // 9
+        s = colors[suit]
         n = pn % 9 + 1
         nn = [n, n, n, n]
         if has_aka and s != "z" and n == 5:
@@ -288,7 +319,12 @@ def nakimentsu(m: int, has_aka: bool) -> Tuple[str, str]:
 
         paist = s + "".join(map(lambda x: str(x), nn)) + d
         atype = "kan"
-    return paist, atype
+        if fromWho == 0:
+            packed_pai = create_packed_pai_format((suit * 9 + n) << 2, 0, 0, PAI_TYPE_ANKAN, fromWho, r)
+        else:
+            packed_pai = create_packed_pai_format((suit * 9 + n) << 2, 0, 0, PAI_TYPE_MINKAN, fromWho, r)
+
+    return paist, atype, packed_pai
 
 
 def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> int:
@@ -376,8 +412,9 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
                 haistr = child.attrib.get(f"hai{n}")
 
                 if haistr is not None and haistr != "":
-                    haipai = num_to_hai(list(map(lambda x: int(x), haistr.split(","))), has_aka)
-                    haipais.append({"kyoku_id": kyoku_id, "player_index": n, "haipai": haipai})
+                    pai_ids = list(map(lambda x: int(x), haistr.split(",")))
+                    haipai = num_to_hai(pai_ids, has_aka)
+                    haipais.append({"kyoku_id": kyoku_id, "player_index": n, "haipai": haipai, "pai_ids": pai_ids})
         elif child.tag == "DORA":
             _ = 0
         elif child.tag == "REACH":
@@ -406,7 +443,10 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
             if m is not None:
                 ms = m.split(",")
                 ms.reverse()
-                tehais.extend(list(map(lambda x: nakimentsu(int(x), has_aka)[0], ms)))
+                for mentsu in ms:
+                    paist, _, packed_pai = nakimentsu(int(mentsu), has_aka)
+                    tehais.append(paist)
+                    hai_list.append(packed_pai)
 
             fu = int(ten[0])
             han = 0
@@ -426,7 +466,7 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
 
             scs = [sc[1], sc[3], sc[5], sc[7]]
 
-            dora_str = dora_hai(list(map(lambda x: int(x), child.attrib["doraHai"].split(","))))
+            doras = list(map(lambda x: int(x), child.attrib["doraHai"].split(",")))
 
             u = child.attrib.get("doraHaiUra")
 
@@ -435,14 +475,17 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
             agaris.append(
                 {
                     "kyoku_id": kyoku_id,
-                    "machihai": num_to_hai([machi], has_aka),
+                    "machipai": machi,
                     "score": score,
                     "fu": fu,
                     "han": han,
                     "tehai": ",".join(tehais),
+                    "pai_ids": hai_list,
                     "yaku": yaku_stats,
-                    "dora": dora_str,
+                    "dora": dora_hai(doras),
+                    "dora_orig": doras,
                     "uradora": dora_hai(uradoras),
+                    "uradora_orig": uradoras,
                     "who": who,
                     "by": fromWho,
                     "score_diff": scs,
@@ -468,9 +511,9 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
         elif child.tag == "N":
             # なき
             who = int(child.attrib["who"])
-            paist, atype = nakimentsu(int(child.attrib["m"]), has_aka)
+            paist, atype, packed_pai = nakimentsu(int(child.attrib["m"]), has_aka)
 
-            actions.append({"kyoku_id": kyoku_id, "player_index": who, "seq": action_count, "type": atype, "pais": paist})
+            actions.append({"kyoku_id": kyoku_id, "player_index": who, "seq": action_count, "type": atype, "pais": paist, "pai_id": packed_pai})
             action_count += 1
             if atype == "kan":
                 kan = True
