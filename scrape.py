@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple, Any, Set
+from typing import List, Dict, Tuple, Any, Set, Optional
 from datetime import datetime
 import xml.etree.ElementTree as ET
 import pyarrow as pa
@@ -60,7 +60,7 @@ Haipai = pa.schema(
 Agari = pa.schema(
     [
         pa.field("kyoku_id", pa.int64()),
-        pa.field("machipai", pa.int32()),
+        pa.field("machipai", pa.uint32()),
         pa.field("score", pa.int32()),
         pa.field("fu", pa.int32()),
         pa.field("han", pa.int32()),
@@ -85,6 +85,7 @@ Agari = pa.schema(
         pa.field("by", pa.int32()),
         pa.field("score_diff", pa.list_(pa.int32(), 4)),
         pa.field("owari", pa.bool_()),
+        pa.field("nukidora", pa.uint32()),
     ]
 )
 
@@ -236,7 +237,7 @@ def num_to_hai(num_list: List[int], has_aka: bool) -> str:
     return "".join(pais)
 
 
-def nakimentsu(m: int, has_aka: bool) -> Tuple[str, str, int]:
+def nakimentsu(m: int, has_aka: bool) -> Optional[Tuple[str, str, int]]:
     types = ["", "+", "=", "-"]
     colors = ["m", "p", "s", "z"]
     fromWho = m & 0x03
@@ -300,7 +301,7 @@ def nakimentsu(m: int, has_aka: bool) -> Tuple[str, str, int]:
             paist = s + "".join(map(lambda x: str(x), nn[0:3])) + d + str(nn[3])
             atype = "kan"
             packed_pai = create_packed_pai_format((suit * 9 + n) << 2, 0, 0, PAI_TYPE_MINKAN, fromWho, r)
-    else:
+    elif (m & 0x0030) == 0:
         # 暗カンまたは大明槓
         pt = m >> 8
         r = pt % 4
@@ -323,6 +324,8 @@ def nakimentsu(m: int, has_aka: bool) -> Tuple[str, str, int]:
             packed_pai = create_packed_pai_format((suit * 9 + n) << 2, 0, 0, PAI_TYPE_ANKAN, fromWho, r)
         else:
             packed_pai = create_packed_pai_format((suit * 9 + n) << 2, 0, 0, PAI_TYPE_MINKAN, fromWho, r)
+    else:
+        return None
 
     return paist, atype, packed_pai
 
@@ -439,14 +442,19 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
             tehais = [num_to_hai(hai_list, has_aka)]
 
             m = child.attrib.get("m")
+            nukidora = 0
 
             if m is not None:
                 ms = m.split(",")
                 ms.reverse()
                 for mentsu in ms:
-                    paist, _, packed_pai = nakimentsu(int(mentsu), has_aka)
-                    tehais.append(paist)
-                    hai_list.append(packed_pai)
+                    ret = nakimentsu(int(mentsu), has_aka)
+                    if ret is not None:
+                        paist, _, packed_pai = ret
+                        tehais.append(paist)
+                        hai_list.append(packed_pai)
+                    else:
+                        nukidora += 1
 
             fu = int(ten[0])
             han = 0
@@ -483,13 +491,14 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
                     "pai_ids": hai_list,
                     "yaku": yaku_stats,
                     "dora": dora_hai(doras),
-                    "dora_orig": doras,
+                    "dora_orig": doras.copy(),
                     "uradora": dora_hai(uradoras),
-                    "uradora_orig": uradoras,
+                    "uradora_orig": uradoras.copy(),
                     "who": who,
                     "by": fromWho,
                     "score_diff": scs,
                     "owari": owari is not None,
+                    "nukidora": nukidora,
                 }
             )
 
@@ -511,12 +520,14 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
         elif child.tag == "N":
             # なき
             who = int(child.attrib["who"])
-            paist, atype, packed_pai = nakimentsu(int(child.attrib["m"]), has_aka)
+            ret = nakimentsu(int(child.attrib["m"]), has_aka)
+            if ret is not None:
+                paist, atype, packed_pai = ret
 
-            actions.append({"kyoku_id": kyoku_id, "player_index": who, "seq": action_count, "type": atype, "pais": paist, "pai_id": packed_pai})
-            action_count += 1
-            if atype == "kan":
-                kan = True
+                actions.append({"kyoku_id": kyoku_id, "player_index": who, "seq": action_count, "type": atype, "pais": paist, "pai_id": packed_pai})
+                action_count += 1
+                if atype == "kan":
+                    kan = True
         elif re.match(r"^[TUVW]\d+$", child.tag):
             # ツモ
             who = (ord(child.tag[0]) - ord("T") + 4 - oya) % 4

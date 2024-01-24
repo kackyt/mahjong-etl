@@ -30,8 +30,9 @@ else:
             for file in tqdm(os.listdir(path)):
                 filepath = os.path.join(path, file)
                 if os.path.isfile(filepath):
-                    game_id, _ = os.path.splitext(file)
-                    tree = ET.parse(filepath)
-                    seqno = parse_document(tree.getroot(), game_id, dt, seqno)
+                    game_id, ext = os.path.splitext(file)
+                    if ext == ".xml":
+                        tree = ET.parse(filepath)
+                        seqno = parse_document(tree.getroot(), game_id, dt, seqno)
             if args.output_dir is not None:
                 save_to_parquet(args.output_dir, dt)

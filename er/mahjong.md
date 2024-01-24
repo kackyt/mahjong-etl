@@ -58,6 +58,7 @@ erDiagram
     array(int) uradora_orig
     int who
     int by
+    int nukidora
     array(int) score_diff
     bool owari
   }
