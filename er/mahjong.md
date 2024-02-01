@@ -1,18 +1,24 @@
 ```mermaid
 erDiagram
+  experiments ||--|{ games : ""
   game_players ||--|{ games : ""
   game_players ||--|{ players : ""
   games ||--|{ kyokus : ""
   games ||--|{ game_scores : ""
+  paiyamas ||--|{ kyokus : ""
   kyokus ||--|{ haipais : ""
   kyokus ||--|{ actions : ""
   kyokus ||--o| agaris : ""
   kyokus ||--o| nagares : ""
-  kyokus ||--o| haiyamas : ""
+
+  experiments {
+    string id PK
+  }
 
   players {
     string name PK
   }
+
   kyokus {
     bigint id PK
     string game_id FK
@@ -24,7 +30,7 @@ erDiagram
   }
 
   paiyamas {
-    bigint kyoku_id PK,FK
+    bigint id PK,FK
     array(int) pai_ids
   }
 
