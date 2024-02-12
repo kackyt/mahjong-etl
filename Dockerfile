@@ -11,7 +11,7 @@ WORKDIR ${APP_PATH}
 
 RUN groupadd -r app && useradd -r -g app app
 RUN mkdir -p ${HOME}
-RUN bash build.sh
+RUN set -e && bash build.sh
 RUN chown -R app:app ${APP_PATH}
 RUN chown -R app:app ${HOME}
 
