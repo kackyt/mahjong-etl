@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple, Any, Set, Optional
+from typing import List, Dict, Tuple, Any, Optional
 from datetime import datetime
 import xml.etree.ElementTree as ET
 import pyarrow as pa
@@ -10,18 +10,40 @@ import decimal
 import urllib.parse
 
 # parquetに書き出すテーブルおよびレコード
-Player = pa.schema([pa.field("name", pa.string())])
-
 Game = pa.schema(
     [
         pa.field("id", pa.string()),
-        pa.field("tonpu", pa.bool_()),
-        pa.field("ariari", pa.bool_()),
-        pa.field("has_aka", pa.bool_()),
-        pa.field("demo", pa.bool_()),
-        pa.field("soku", pa.bool_()),
-        pa.field("level", pa.int32()),
         pa.field("started_at", pa.date64()),
+    ]
+)
+
+Rule = pa.schema(
+    [
+        pa.field("game_id", pa.string()),
+        pa.field("enable_kuitan", pa.bool_()),
+        pa.field("enable_atozuke", pa.bool_()),
+        pa.field("enable_pao", pa.bool_()),
+        pa.field("enable_tobi", pa.bool_()),
+        pa.field("enable_wareme", pa.bool_()),
+        pa.field("enable_kunaoshi", pa.bool_()),
+        pa.field("enable_kuriage", pa.bool_()),
+        pa.field("enable_agariyame", pa.bool_()),
+        pa.field("enable_minus_riichi", pa.bool_()),
+        pa.field("enable_ryanhan_shibari", pa.bool_()),
+        pa.field("enable_keiten", pa.bool_()),
+        pa.field("aka_type", pa.uint32()),
+        pa.field("shanyu_score", pa.int32()),
+        pa.field("nannyu_score", pa.int32()),
+        pa.field("uradora_type", pa.int32()),
+        pa.field("furiten_riichi_type", pa.uint32()),
+        pa.field("oyanagare_type", pa.uint32()),
+        pa.field("double_ron_type", pa.uint32()),
+        pa.field("kan_in_riichi_type", pa.uint32()),
+        pa.field("initial_score", pa.uint32()),
+        pa.field("is_demo", pa.bool_()),
+        pa.field("is_soku", pa.bool_()),
+        pa.field("is_sanma", pa.bool_()),
+        pa.field("level", pa.int32()),
     ]
 )
 
@@ -102,8 +124,8 @@ Action = pa.schema(
 
 Nagare = pa.schema([pa.field("kyoku_id", pa.int64()), pa.field("name", pa.string()), pa.field("score_diff", pa.list_(pa.int32(), 4))])
 
-players: Set[str] = set()
 games: List[Dict[str, Any]] = []
+rules: List[Dict[str, Any]] = []
 game_players: List[Dict[str, Any]] = []
 game_scores: List[Dict[str, Any]] = []
 kyokus: List[Dict[str, Any]] = []
@@ -348,10 +370,9 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
         if child.tag == "GO":
             tp = int(child.attrib["type"])
 
-            if (tp & 0x02) != 0:
-                has_aka = True
-            else:
-                has_aka = False
+            has_aka = (tp & 0x02) != 0
+            is_sanma = (tp & 0x10) != 0
+
             games.append(
                 {
                     "id": game_id,
@@ -363,6 +384,36 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
                     "has_aka": has_aka,
                     "level": (tp & 0x20) >> 4 | (tp & 0x80) >> 7,
                     "started_at": dt64,
+                }
+            )
+            rules.append(
+                {
+                    "game_id": game_id,
+                    "enable_kuitan": (tp & 0x04) == 0,
+                    "enable_atozuke": (tp & 0x04) == 0,
+                    "enable_pao": True,
+                    "enable_tobi": True,
+                    "enable_wareme": False,
+                    "enable_kunaoshi": True,
+                    "enable_kuriage": False,
+                    "enable_agariyame": True,
+                    "enable_minus_riichi": True,
+                    "enable_ryanhan_shibari": False,
+                    "enable_keiten": True,
+                    "enable_glass_pai": False,
+                    "aka_type": 73 if has_aka else 0,
+                    "shanyu_score": 30000,
+                    "nannyu_score": 0 if (tp & 0x08) == 0 else -1,
+                    "uradora_type": 2,
+                    "furiten_riichi_type": 3,
+                    "oyanagare_type": 0xF,
+                    "double_ron_type": 1,
+                    "initial_score": 35000 if is_sanma else 25000,
+                    "kan_in_riichi_type": (tp & 0x10000) >> 16,
+                    "is_demo": (tp & 0x01) == 0,
+                    "is_soku": (tp & 0x40) != 0,
+                    "is_sanma": is_sanma,
+                    "level": (tp & 0x20) >> 4 | (tp & 0x80) >> 7,
                 }
             )
         elif child.tag == "UN":
@@ -552,9 +603,6 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
             reach = False
             actions.append({"kyoku_id": kyoku_id, "player_index": who, "seq": action_count, "type": "sutehai", "pais": p})
             action_count += 1
-    for name in player_name.values():
-        players.add(name)
-
     for idx, key in enumerate(sorted(player_name.items())):
         game_players.append({"game_id": game_id, "player_name": key[1], "player_index": idx})
 
@@ -563,8 +611,8 @@ def parse_document(root: ET.Element, game_id: str, dt: datetime, seqno: int) -> 
 
 def save_to_parquet(basedir: str, dt: datetime):
     datestr = dt.strftime(r"dt=%Y-%m-%d")
-    os.makedirs(os.path.join(basedir, "players", datestr), exist_ok=True)
     os.makedirs(os.path.join(basedir, "games", datestr), exist_ok=True)
+    os.makedirs(os.path.join(basedir, "rules", datestr), exist_ok=True)
     os.makedirs(os.path.join(basedir, "game_players", datestr), exist_ok=True)
     os.makedirs(os.path.join(basedir, "game_scores", datestr), exist_ok=True)
     os.makedirs(os.path.join(basedir, "kyokus", datestr), exist_ok=True)
@@ -572,14 +620,14 @@ def save_to_parquet(basedir: str, dt: datetime):
     os.makedirs(os.path.join(basedir, "actions", datestr), exist_ok=True)
     os.makedirs(os.path.join(basedir, "agaris", datestr), exist_ok=True)
     os.makedirs(os.path.join(basedir, "nagares", datestr), exist_ok=True)
-    wp = pq.ParquetWriter(os.path.join(basedir, "players", datestr, "players.parquet"), schema=Player)
-    batch = pa.RecordBatch.from_pandas(pd.DataFrame([{"name": name} for name in players]), schema=Player)
-    wp.write_batch(batch)
-    wp.close()
     wg = pq.ParquetWriter(os.path.join(basedir, "games", datestr, "games.parquet"), schema=Game)
     batch = pa.RecordBatch.from_pandas(pd.DataFrame(games), schema=Game)
     wg.write_batch(batch)
     wg.close()
+    wgr = pq.ParquetWriter(os.path.join(basedir, "rules", datestr, "rules.parquet"), schema=Rule)
+    batch = pa.RecordBatch.from_pandas(pd.DataFrame(rules), schema=Rule)
+    wgr.write_batch(batch)
+    wgr.close()
     wgp = pq.ParquetWriter(os.path.join(basedir, "game_players", datestr, "game_players.parquet"), schema=GamePlayer)
     batch = pa.RecordBatch.from_pandas(pd.DataFrame(game_players), schema=GamePlayer)
     wgp.write_batch(batch)
@@ -610,7 +658,6 @@ def save_to_parquet(basedir: str, dt: datetime):
         batch = pa.RecordBatch.from_pandas(pd.DataFrame(nagares), schema=Nagare)
         wn.write_batch(batch)
         wn.close()
-    players.clear()
     games.clear()
     game_players.clear()
     game_scores.clear()

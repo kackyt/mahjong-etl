@@ -43,7 +43,7 @@ readme = "README.md"
 packages = [{include = "mahjong_etl"}]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.12"
 requests = "^2.31.0"
 pyarrow = "^14.0.1"
 pandas = "^2.1.4"

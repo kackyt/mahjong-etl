@@ -1,29 +1,25 @@
 from urllib.parse import urlparse
 from tqdm import tqdm
-from typing import Optional
-from datetime import datetime, timezone
-import xml.etree.ElementTree as ET
 import requests
 import gzip
 import re
 import os
-
-from scrape import parse_document, save_to_parquet
-
+import argparse
 
 headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"}
 
 DOWNLOAD_PREFIX = "https://tenhou.net/sc/raw/dat/"
 
 
-def extract_latest_logs(log_dir: str, output_dir: Optional[str]):
-    r = requests.get("https://tenhou.net/sc/raw/list.cgi", headers=headers)
+def extract_logs(is_old: bool, log_dir: str):
+    old_query = "?old" if is_old else ""
+    r = requests.get(f"https://tenhou.net/sc/raw/list.cgi{old_query}", headers=headers)
     atag = re.compile(r"<a\s+href=[\"'](?P<href>.*?)[\"']")
+
+    r.raise_for_status()
 
     text = r.text.replace("list([\r\n", "").replace(");", "")
     files = text.split(",\r\n")
-    prev_dt = None
-    seqno = 0
 
     for archive_item in files:
         if "html" in archive_item:
@@ -39,14 +35,10 @@ def extract_latest_logs(log_dir: str, output_dir: Optional[str]):
 
             if dtstr is None:
                 raise Exception("date cannot found")
-            dt = datetime.strptime(dtstr[0], r"%Y%m%d").replace(tzinfo=timezone.utc)
-
-            if output_dir is not None and prev_dt is not None and prev_dt != dt:
-                save_to_parquet(output_dir, prev_dt)
-                seqno = 0
-            prev_dt = dt
 
             page = requests.get(url, headers=headers)
+
+            page.raise_for_status()
 
             data = gzip.decompress(page.content).decode("utf-8")
 
@@ -65,17 +57,17 @@ def extract_latest_logs(log_dir: str, output_dir: Optional[str]):
                     # ファイルの存在チェック
                     filepath = os.path.join(log_dir, dtstr[0], f"{log_id}.xml")
 
-                    if os.path.exists(filepath):
-                        # 存在する場合は読み出す
-                        if output_dir is not None:
-                            tree = ET.parse(filepath)
-                            seqno = parse_document(tree.getroot(), log_id, dt, seqno)
-                    else:
-                        log_file = requests.get(url, headers=headers)
+                    log_file = requests.get(url, headers=headers)
 
-                        with open(filepath, "w") as f:
-                            f.write(log_file.text)
+                    with open(filepath, "w") as f:
+                        f.write(log_file.text)
 
-                        if output_dir is not None:
-                            doc = ET.fromstring(log_file.text)
-                            seqno = parse_document(doc, log_id, dt, seqno)
+
+parser = argparse.ArgumentParser(description="tenho mahjong log etl tool")
+
+parser.add_argument("--old", help="log file download from old or latest archive", action="store_true")
+parser.add_argument("--output-dir", "-O", help="transform log output directory", type=str)
+
+args = parser.parse_args()
+
+extract_logs(args.old, args.output_dir)
