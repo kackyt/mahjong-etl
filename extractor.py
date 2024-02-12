@@ -16,6 +16,8 @@ def extract_logs(is_old: bool, log_dir: str):
     r = requests.get(f"https://tenhou.net/sc/raw/list.cgi{old_query}", headers=headers)
     atag = re.compile(r"<a\s+href=[\"'](?P<href>.*?)[\"']")
 
+    r.raise_for_status()
+
     text = r.text.replace("list([\r\n", "").replace(");", "")
     files = text.split(",\r\n")
 
@@ -35,6 +37,8 @@ def extract_logs(is_old: bool, log_dir: str):
                 raise Exception("date cannot found")
 
             page = requests.get(url, headers=headers)
+
+            page.raise_for_status()
 
             data = gzip.decompress(page.content).decode("utf-8")
 
