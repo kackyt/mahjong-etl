@@ -16,6 +16,7 @@ echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud
     apt-get update -y && \
     apt-get install google-cloud-sdk -y --no-install-recommends
 
+rm -rf /var/lib/apt/lists/*
 apt-get clean
 
 # poetry install
