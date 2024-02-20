@@ -2,7 +2,10 @@
 
 set -e
 
+if [ ! -d logs ]; then
 mkdir logs
+fi
+
 gcloud storage cp gs://${BUCKET_NAME}/logs/${DATE}* ./logs --recursive -x '.*\.DS_Store'
 
 poetry run python main.py -L logs -O parquet
