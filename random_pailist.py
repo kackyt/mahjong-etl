@@ -25,7 +25,7 @@ parser.add_argument("--batch-size", "-b", help="record batch size", type=int, de
 
 args = parser.parse_args()
 
-Paiyama = pa.schema([pa.field("id", pa.int64()), pa.field("pai_ids", pa.list_(pa.uint32(), 136))])
+Paiyama = pa.schema([pa.field("id", pa.uint64()), pa.field("pai_ids", pa.list_(pa.uint32(), 136))])
 
 dt = datetime.now(timezone.utc)
 RANDOM_PAIYAMA_ID_OFFSET = 900_000_000_000
