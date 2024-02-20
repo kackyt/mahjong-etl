@@ -1,4 +1,7 @@
 #!/bin/bash
+
+set -e
+
 mkdir logs
 gcloud storage cp gs://${BUCKET_NAME}/logs/${DATE}* ./logs --recursive -x '.*\.DS_Store'
 
