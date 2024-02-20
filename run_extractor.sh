@@ -1,6 +1,6 @@
 #!/bin/bash
 
-python extractor.py -O logs --old
-python extractor.py -O logs
+python extractor.py -O logs --old --date ${DATE}
+python extractor.py -O logs --date ${DATE}
 
 gcloud storage rsync logs gs://${BUCKET_NAME}/logs  --recursive -x '.*\.DS_Store'

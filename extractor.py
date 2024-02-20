@@ -11,7 +11,7 @@ headers = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Geck
 DOWNLOAD_PREFIX = "https://tenhou.net/sc/raw/dat/"
 
 
-def extract_logs(is_old: bool, log_dir: str):
+def extract_logs(is_old: bool, log_dir: str, date: str | None):
     old_query = "?old" if is_old else ""
     r = requests.get(f"https://tenhou.net/sc/raw/list.cgi{old_query}", headers=headers)
     atag = re.compile(r"<a\s+href=[\"'](?P<href>.*?)[\"']")
@@ -27,15 +27,19 @@ def extract_logs(is_old: bool, log_dir: str):
 
             file_name = archive_name
 
-            print(f"Downloading {file_name}")
             url = os.path.join(DOWNLOAD_PREFIX, file_name)
 
             # ファイル名から日付(yyyymmdd)を取り出す
             dtstr = re.search(r"\d{8}", file_name)
 
             if dtstr is None:
-                raise Exception("date cannot found")
+                continue
 
+            if not (date is None or dtstr[0].startswith(date)):
+                print(f"skip {file_name}")
+                continue
+
+            print(f"Downloading {file_name}")
             page = requests.get(url, headers=headers)
 
             page.raise_for_status()
@@ -66,8 +70,9 @@ def extract_logs(is_old: bool, log_dir: str):
 parser = argparse.ArgumentParser(description="tenho mahjong log etl tool")
 
 parser.add_argument("--old", help="log file download from old or latest archive", action="store_true")
-parser.add_argument("--output-dir", "-O", help="transform log output directory", type=str)
+parser.add_argument("--output-dir", "-O", help="transform log output directory", type=str, required=True)
+parser.add_argument("--date", "-d", help="date prefix to download", type=str)
 
 args = parser.parse_args()
 
-extract_logs(args.old, args.output_dir)
+extract_logs(args.old, args.output_dir, args.date)
